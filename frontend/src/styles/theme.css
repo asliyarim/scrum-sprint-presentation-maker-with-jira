@@ -2558,6 +2558,15 @@ header.topbar .btn:hover {
   align-items: flex-start;
   flex-wrap: wrap;
 }
+
+/* Birden fazla takima bakan PO'da her takim ayri bir panel olarak alt alta
+   dizilir (bkz. PresentationsPage) - ikinci panelden itibaren ince bir ayirici.
+   Tek takimli PO'da bu kural hic devreye girmez, gorunum aynen korunur. */
+.presentations-page > .presentation-panel-layout + .presentation-panel-layout {
+  margin-top: 30px;
+  padding-top: 26px;
+  border-top: 1px solid var(--line);
+}
 .presentation-list-panel {
   flex: 1 1 460px;
   max-width: 780px;

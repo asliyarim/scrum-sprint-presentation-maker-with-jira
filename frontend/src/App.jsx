@@ -486,7 +486,74 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   const [presentationMeta, setPresentationMeta] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [saveStatus, setSaveStatus] = useState({ loading: false, error: null });
-  const saveTeamId = presentationMeta?.teamId ?? newForTeamId ?? personnel?.teamId ?? null;
+  // Kapakta secili Takım Tipi'ne karsilik gelen takim (teams listesi ile
+  // TEAM_TYPES 1-1 eslesir, bkz. V13__seed_teams.sql).
+  const teamIdForSelectedType = useMemo(
+    () => teams?.find((t) => t.teamType === sprintForm.teamType)?.id ?? null,
+    [teams, sprintForm.teamType]
+  );
+
+  /**
+   * Kullanicinin bu takima KAYIT yetkisi var mi? Kaynak, backend'in
+   * PresentationFacade.requireEditAccess'te kullandigi listenin ta kendisi
+   * (JWT'deki teamIds) - boylece frontend backend'in reddedecegi bir takima
+   * kaydetmeye calismaz.
+   */
+  const canSaveToTeam = (id) => {
+    if (id == null) return false;
+    if (currentUser.admin) return true;
+    const izinli = personnel?.teamIds?.length
+      ? personnel.teamIds
+      : personnel?.teamId != null ? [personnel.teamId] : [];
+    return izinli.includes(id);
+  };
+
+  /**
+   * YENI bir sunum hangi takima kaydedilecek?
+   *
+   * Eskiden son care olarak DOGRUDAN personnel.teamId (PO'nun BIRINCIL takimi)
+   * kullaniliyordu. Iki-uc takima birden bakan PO'larda bu, kapakta secilen
+   * Takım Tipi ne olursa olsun her sunumu birincil takima yaziyordu; sunumlar
+   * (team_id, sprint_no) ile tekil oldugu icin ikinci takimin ayni numarali
+   * sprinti birincisinin UZERINE yaziliyordu (kullanici bildirimleri
+   * 2026-08-25: "DU sprint 10'u ezdi ve üzerine yazdı", "mobili dijital
+   * uygulamaların içerisine attı").
+   */
+  /**
+   * "Uzerinde calisilan sunum" - presentationMeta, SADECE kapakta secili takim
+   * hala o sunumun takimiysa gecerlidir.
+   *
+   * NEDEN: presentationMeta her basarili kayittan sonra (ve /editor/:id ile
+   * acilista) doluyor, ama kapaktan BASKA bir takim tipi secildiginde
+   * temizlenmiyordu. Iki takima bakan bir PO "DU Sprint 4"u kaydedip ardindan
+   * takim tipini CBS yapip tekrar kaydettiginde, kayit yine DU'nun sunumuna
+   * YENI SURUM olarak yaziliyordu (kullanici bildirimi 2026-08-25: "kaydoldu
+   * diyor v4 olarak ama sunumlarima cikmiyor"). Daha kotusu
+   * autoSaveOnNavigate, adim degistirir degistirmez ayni sunumu YERINDE
+   * (surum bile eklemeden) CBS icerigiyle eziyordu.
+   */
+  const aktifSunum =
+    presentationMeta && (teamIdForSelectedType == null || presentationMeta.teamId === teamIdForSelectedType)
+      ? presentationMeta
+      : null;
+
+  /**
+   * YENI bir sunum hangi takima kaydedilecek?
+   *
+   * Eskiden son care olarak DOGRUDAN personnel.teamId (PO'nun BIRINCIL takimi)
+   * kullaniliyordu. Iki-uc takima birden bakan PO'larda bu, kapakta secilen
+   * Takım Tipi ne olursa olsun her sunumu birincil takima yaziyordu; sunumlar
+   * (team_id, sprint_no) ile tekil oldugu icin ikinci takimin ayni numarali
+   * sprinti birincisinin UZERINE yaziliyordu (kullanici bildirimleri
+   * 2026-08-25: "DU sprint 10'u ezdi ve üzerine yazdı", "mobili dijital
+   * uygulamaların içerisine attı").
+   */
+  const saveTeamId =
+    aktifSunum?.teamId ??
+    (canSaveToTeam(teamIdForSelectedType) ? teamIdForSelectedType : null) ??
+    newForTeamId ??
+    personnel?.teamId ??
+    null;
   // "Tamamlanan İşler" kutusundaki Epic-label filtresi icin (bkz.
   // jiraContentMapper.js epicLabeledWithOwnTeam, kullanici teyidi 2026-08-20) -
   // takimin Jira proje anahtari (orn. "RPA") teams listesinden okunur.
@@ -498,16 +565,13 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   // fonksiyon govdesindeki konumu onemli degil).
   const jiraDash = useJiraDashboard(sprintForm.team, sprintForm.setTeam, sprintForm.sprint, sprintForm.setSprint, saveTeamId, sprintForm.teamType, sprintForm.setRange);
   // Sektor (ops.) dropdown'u saveTeamId'YE DEGIL, o an KAPAKTA secili Takım
-  // Tipi'ne gore olmali - saveTeamId (kaydedilecek sunumun kimligi) henuz bir
-  // sunum yuklenmemis/kaydedilmemisse eski/boş kalabiliyor, bu durumda kapakta
-  // "Ürün Geliştirme" secili olsa bile sektor listesi baska bir takima (veya
-  // hicbirine) ait cekilip eski sabit listeye duseriyordu (bkz. kullanici
-  // bildirimi, 2026-08-18: "EDAŞ ... gözükmüyor" - PO henuz bir sunum
-  // yuklemeden sadece Takım Tipi'ni degistirerek test ediyordu).
-  const teamIdForSelectedType = useMemo(
-    () => teams?.find((t) => t.teamType === sprintForm.teamType)?.id ?? null,
-    [teams, sprintForm.teamType]
-  );
+  // Tipi'ne gore olmali (teamIdForSelectedType - yukarida tanimli) - saveTeamId
+  // (kaydedilecek sunumun kimligi) henuz bir sunum yuklenmemis/kaydedilmemisse
+  // eski/boş kalabiliyor, bu durumda kapakta "Ürün Geliştirme" secili olsa bile
+  // sektor listesi baska bir takima (veya hicbirine) ait cekilip eski sabit
+  // listeye duseriyordu (bkz. kullanici bildirimi, 2026-08-18: "EDAŞ ...
+  // gözükmüyor" - PO henuz bir sunum yuklemeden sadece Takım Tipi'ni
+  // degistirerek test ediyordu).
   const sectorOptions = useSectorOptions(teamIdForSelectedType);
 
   // Baska takimi salt-okunur goruntulerken SADECE o sunumun kayitli
@@ -849,11 +913,11 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   // - handleSave'in aksine YENI bir surum EKLEMEZ, mevcut guncel surumu
   // YERINDE degistirir (bkz. apiClient.updatePresentationInPlace).
   const handleUpdateInPlace = async () => {
-    if (!presentationMeta?.id) return;
+    if (!aktifSunum?.id) return;
     if (!validateBeforeSave()) return;
     setSaveStatus({ loading: true, error: null });
     try {
-      const saved = await updatePresentationInPlace(presentationMeta.id, sprintForm.range, buildSaveContent());
+      const saved = await updatePresentationInPlace(aktifSunum.id, sprintForm.range, buildSaveContent());
       setPresentationMeta({ id: saved.id, teamId: saved.teamId, sprintNo: saved.sprintNo, currentVersion: saved.currentVersion });
       setSaveStatus({ loading: false, error: null });
     } catch (err) {
@@ -897,8 +961,8 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   // Henuz hic kaydedilmemis (presentationMeta yok) bir sunumda calismaz -
   // her adim gecisinde YENI bir surum OLUSTURMAZ, sadece VAR OLANI gunceller.
   const autoSaveOnNavigate = () => {
-    if (!canEdit || !presentationMeta?.id || !saveTeamId) return;
-    updatePresentationInPlace(presentationMeta.id, sprintForm.range, buildSaveContent())
+    if (!canEdit || !aktifSunum?.id || !saveTeamId) return;
+    updatePresentationInPlace(aktifSunum.id, sprintForm.range, buildSaveContent())
       .then((saved) => {
         setPresentationMeta({ id: saved.id, teamId: saved.teamId, sprintNo: saved.sprintNo, currentVersion: saved.currentVersion });
       })
@@ -1029,7 +1093,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
               generating={fullExport.loading}
               onSave={canEdit ? handleSave : null}
               saving={saveStatus.loading}
-              onUpdate={canEdit && fromJoint && presentationMeta ? handleUpdateInPlace : null}
+              onUpdate={canEdit && fromJoint && aktifSunum ? handleUpdateInPlace : null}
               updating={saveStatus.loading}
               onJiraSync={canEdit ? handleJiraSync : null}
               jiraSyncing={jiraSyncing}
@@ -1042,7 +1106,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
               generating={fullExport.loading}
               onSave={canEdit ? handleSave : null}
               saving={saveStatus.loading}
-              onUpdate={canEdit && fromJoint && presentationMeta ? handleUpdateInPlace : null}
+              onUpdate={canEdit && fromJoint && aktifSunum ? handleUpdateInPlace : null}
               updating={saveStatus.loading}
               onJiraSync={canEdit ? handleJiraSync : null}
               jiraSyncing={jiraSyncing}
@@ -1084,9 +1148,9 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
           setSaveStatus((s) => ({ ...s, error: null }));
         }}
       />
-      {presentationMeta && !saveStatus.error && !viewingOtherTeam && (
+      {aktifSunum && !saveStatus.error && !viewingOtherTeam && (
         <div style={{ margin: "0 22px 10px", fontSize: 12.5, color: "var(--mut)" }}>
-          ✓ Kaydedildi (v{presentationMeta.currentVersion})
+          ✓ Kaydedildi (v{aktifSunum.currentVersion})
         </div>
       )}
 
