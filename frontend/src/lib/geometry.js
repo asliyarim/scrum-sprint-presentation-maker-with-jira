@@ -247,14 +247,13 @@ export function pickCardFS(items, availH) {
   return FS_MIN;
 }
 
-const ROW_KEYS = { top: ["done", "active"], bottom: ["risk", "pending"] };
-
 /**
  * Icerik slaytinin 4 kartini da (her biri KENDI madde sayisina gore BAGIMSIZ
- * yazi boyutuyla) sigdirir. Ayni satirdaki iki kart (done|active, risk|pending)
- * gorsel hizalanma icin AYNI kart yuksekligini paylasir (max of the two), ama
- * fontlari birbirinden bagimsizdir - onceki surumde TUM slayt TEK bir paylasilan
- * fontu kullaniyordu (bir kart cok maddeliyse digerleri de gereksiz kuculuyordu).
+ * yazi boyutuyla) sigdirir. Dikey alan SUTUN basina paylastirilir: sol sutun
+ * (Tamamlanan Isler + Riskler) ve sag sutun (Yapilacak Isler + Bekleyen
+ * Konular) birbirinden BAGIMSIZ bolunur, yani iki karti ayiran sinir sutunlarda
+ * farkli yuksekliklerde olabilir. Boylece bir sutundaki bos kart, ayni satirdaki
+ * dolu kartin yerini daraltmaz.
  *
  * Kirpma IKI asamalidir: once sutun basina MAX_ITEMS_PER_COLUMN siniri uygulanir
  * (okunabilirlik icin sabit ust sinir), sonra -metinler cok uzunsa- en kucuk
@@ -306,37 +305,62 @@ export function fitContent(d, cardsTop) {
   SECTION_KEYS.forEach((k) => {
     ladder[k] = ladderFor(shown(k));
     idx[k] = 0;
-    // Tek basina (satir ortagi olmadan) avail'e bile sigmiyorsa onceden kucult.
-    while (idx[k] < ladder[k].length - 1 && cardH(shown(k), ladder[k][idx[k]]) > avail) idx[k]++;
   });
 
   const fsOf = (k) => ladder[k][idx[k]];
-  const rowH = (row) => Math.max(...ROW_KEYS[row].map((k) => cardH(shown(k), fsOf(k))));
 
-  let guard = 0;
-  while (guard++ < 2000) {
-    const topH = rowH("top"), botH = rowH("bottom");
-    if (topH + G.GAP_Y + botH <= avail) break;
-    const row = topH >= botH ? "top" : "bottom";
-    const [a, b] = ROW_KEYS[row];
-    const tallerKey = cardH(shown(a), fsOf(a)) >= cardH(shown(b), fsOf(b)) ? a : b;
-    if (idx[tallerKey] < ladder[tallerKey].length - 1) {
-      idx[tallerKey]++;
-      continue;
+  // Dikey butce SUTUN basina paylastirilir, SATIR basina DEGIL.
+  //
+  // Eskiden iki sutunun ust kartlari (Tamamlanan|Yapilacak) ortak bir yukseklik
+  // paylasiyordu (max of the two), alt kartlar da (Riskler|Bekleyen) oyle. Bu
+  // yuzden BIR sutundaki dolu kart, DIGER sutundaki bos kartin bosuna ayirdigi
+  // yeri kullanamiyordu: 6 tamamlanan + 6 risk (sol) yaninda 17 bekleyen konu
+  // (sag, ustundeki Yapilacak Isler kartı BOS) yazildiginda ust satir sirf sol
+  // sutun yuzunden 2.58" yer kapliyor, Bekleyen Konular 5.5 pt'ye kadar
+  // kuculuyordu - okunamayacak kadar (kullanici bildirimi 2026-08-26: "punto
+  // cok kuculdu yapilacak isler karti bos olmasina ragmen").
+  //
+  // Artik her sutun kendi 2 kartiyla avail'i paylasir; kartlar arasindaki
+  // sinir sutunlarda FARKLI yuksekliklerde olabilir (kullanici istegi:
+  // "kartlardaki madde sayisina gore kartlarin dikey olarak kaymasi").
+  // Iki sutunun icerigi dengeliyse sonuc eskisiyle AYNI kalir - kartlar yine
+  // hizali gorunur.
+  const columns = {};
+  COLUMN_KEYS.forEach(([ust, alt], i) => {
+    const butce = avail - G.GAP_Y; // iki kart + aralarindaki bosluk
+
+    // Tek basina (sutun ortagi olmadan) butceye bile sigmiyorsa onceden kucult.
+    [ust, alt].forEach((k) => {
+      while (idx[k] < ladder[k].length - 1 && cardH(shown(k), fsOf(k)) > butce) idx[k]++;
+    });
+
+    let guard = 0;
+    while (guard++ < 2000) {
+      const hU = cardH(shown(ust), fsOf(ust));
+      const hA = cardH(shown(alt), fsOf(alt));
+      if (hU + hA <= butce) break;
+      const tallerKey = hU >= hA ? ust : alt;
+      if (idx[tallerKey] < ladder[tallerKey].length - 1) {
+        idx[tallerKey]++;
+        continue;
+      }
+      if (items[tallerKey].length <= 1) break; // daha fazla kucultulemez/kirpilamaz, tasmaya izin ver
+      items[tallerKey].pop();
+      removed[tallerKey]++;
     }
-    if (items[tallerKey].length <= 1) break; // daha fazla kucultulemez/kirpilamiz, tasmaya izin ver
-    items[tallerKey].pop();
-    removed[tallerKey]++;
-  }
+
+    const dogal = { ust: cardH(shown(ust), fsOf(ust)), alt: cardH(shown(alt), fsOf(alt)) };
+    const { topH, botH } = stretchRowHeights(dogal.ust, dogal.alt, cardsTop);
+    columns[i === 0 ? "left" : "right"] = { topH, botH, yBot: cardsTop + topH + G.GAP_Y };
+  });
 
   const sections = {};
   const fsByKey = {};
   SECTION_KEYS.forEach((k) => { sections[k] = shown(k); fsByKey[k] = fsOf(k); });
 
-  const natural = { topH: rowH("top"), botH: rowH("bottom") };
-  const { topH, botH } = stretchRowHeights(natural.topH, natural.botH, cardsTop);
-
-  return { sections, fsByKey, topH, botH };
+  // topH/botH geriye donuk uyumluluk icin SOL sutunun degerleridir - kose
+  // deseni (CornerMesh) zaten sol-alt Riskler kartina hizalanir.
+  return { sections, fsByKey, columns, topH: columns.left.topH, botH: columns.left.botH };
 }
 
 // Öncelik degerlerinin slaytta/PPTX'te gosterilecegi renkler (SEGCOL paletiyle

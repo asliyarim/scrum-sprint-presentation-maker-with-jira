@@ -171,8 +171,10 @@ export default function SlideCanvas({ data, tab, assets, scale }) {
   } else {
     const bars = bandBars(data);
     const cardsTop = cardsTopFor(data);
-    const { sections, fsByKey, topH, botH } = fitContent(data, cardsTop);
-    const yBot = cardsTop + topH + G.GAP_Y;
+    const { sections, fsByKey, columns } = fitContent(data, cardsTop);
+    // Her sutun kendi dikey bolunmesini kullanir - sol sutundaki uzun bir kart
+    // artik sag sutundaki karti daraltmaz (bkz. geometry.fitContent).
+    const sol = columns.left, sag = columns.right;
     const footerTeam = (data.teamName || "Ekip").trim();
     content = (
       <>
@@ -197,24 +199,24 @@ export default function SlideCanvas({ data, tab, assets, scale }) {
             "tam olarak yer alacağı yer riskler kartının sol tarafı" +
             "hala kayık" (sabit y kullanildiginda kart kisa/uzun oldukca
             hizasi kayiyordu). sprintDeckBuilder.addContentSlide ile AYNI
-            hesap (botH*0.92, dikey ortalanmis). */}
+            hesap (sol.botH*0.92, dikey ortalanmis). */}
         {/* Ozel bir sunum arka plani yuklendiyse sablonun kose deseni CIZILMEZ -
             zemini tamamen yuklenen gorsel belirlesin (kullanici teyidi
             2026-08-20: "Gizlensin"). */}
         {!assets.slide_bg && (
           <CornerMesh
-            w={(botH * 0.92) * CORNER_MESH_RATIO}
-            x={-((botH * 0.92) * CORNER_MESH_RATIO) * 0.42}
-            y={yBot + (botH - botH * 0.92) / 2}
+            w={(sol.botH * 0.92) * CORNER_MESH_RATIO}
+            x={-((sol.botH * 0.92) * CORNER_MESH_RATIO) * 0.42}
+            y={sol.yBot + (sol.botH - sol.botH * 0.92) / 2}
             opacity={0.55}
             flip
           />
         )}
         <Band bars={bars} />
-        <Card x={G.X_L} y={cardsTop} w={G.COL_W} h={topH} items={sections.done} sec={SEC.done} fontSize={fsByKey.done} />
-        <Card x={G.X_L} y={yBot} w={G.COL_W} h={botH} items={sections.risk} sec={SEC.risk} fontSize={fsByKey.risk} />
-        <Card x={G.X_R} y={cardsTop} w={G.COL_W} h={topH} items={sections.active} sec={SEC.active} fontSize={fsByKey.active} />
-        <Card x={G.X_R} y={yBot} w={G.COL_W} h={botH} items={sections.pending} sec={SEC.pending} fontSize={fsByKey.pending} />
+        <Card x={G.X_L} y={cardsTop} w={G.COL_W} h={sol.topH} items={sections.done} sec={SEC.done} fontSize={fsByKey.done} />
+        <Card x={G.X_L} y={sol.yBot} w={G.COL_W} h={sol.botH} items={sections.risk} sec={SEC.risk} fontSize={fsByKey.risk} />
+        <Card x={G.X_R} y={cardsTop} w={G.COL_W} h={sag.topH} items={sections.active} sec={SEC.active} fontSize={fsByKey.active} />
+        <Card x={G.X_R} y={sag.yBot} w={G.COL_W} h={sag.botH} items={sections.pending} sec={SEC.pending} fontSize={fsByKey.pending} />
         <div className="s-footer">
           Gizli &amp; Dahili Kullanım&nbsp;&nbsp;|&nbsp;&nbsp;{footerTeam}
           {hasPriorityTags(data) && <PriorityLegend />}

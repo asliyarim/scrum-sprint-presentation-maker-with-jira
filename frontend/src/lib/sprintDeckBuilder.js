@@ -131,7 +131,10 @@ export function addContentSlide(pptx, data, assets, theme = "light", cornerMesh 
   }
 
   const CARDS_TOP = drawBand();
-  const { sections, fsByKey, topH, botH } = fitContent(data, CARDS_TOP);
+  const { sections, fsByKey, columns } = fitContent(data, CARDS_TOP);
+  // Her sutun kendi dikey bolunmesini kullanir (bkz. geometry.fitContent) -
+  // onizlemedeki SlideCanvas ile BIREBIR ayni.
+  const sol = columns.left, sag = columns.right;
 
   function drawCard(x, y, items, sec, fs2, h) {
     s2.addShape(pptx.ShapeType.roundRect, { x, y, w: G.COL_W, h, rectRadius: 0.06, fill: { color: P.CARD_BG }, line: { color: P.CARD_LINE, width: 1 }, shadow: { type: "outer", color: "9CA3AF", blur: 6, offset: 2, angle: 90, opacity: 0.28 } });
@@ -236,30 +239,28 @@ export function addContentSlide(pptx, data, assets, theme = "light", cornerMesh 
     return h;
   }
 
-  const yBot = CARDS_TOP + topH + G.GAP_Y;
-
   // Sablon (Resim1) dekorasyonu - Riskler kartinin (alt-sol) SOLUNDA, kartin
-  // ARKASINDA (kartlardan ONCE cizilir). yBot/botH burada (CARDS_TOP/
+  // ARKASINDA (kartlardan ONCE cizilir). sol.yBot/sol.botH burada (CARDS_TOP/
   // fitContent'ten SONRA) kullanilir ki konum, Riskler kartinin GERCEK
   // (icerige gore degisen) konumuyla HER ZAMAN eslessin - eskiden sabit bir
   // y degeri kullanilinca kart kisa/uzun oldukca "kayık" gorunuyordu (bkz.
   // kullanici bildirimi). flipH ile "sivri uc" sol kenara degil slaytin
   // icine dogru baksin diye yatay olarak aynalanir.
   if (cornerMesh && !assets.slide_bg) {
-    const cmH = botH * 0.92, cmW = cmH * CORNER_MESH_RATIO;
+    const cmH = sol.botH * 0.92, cmW = cmH * CORNER_MESH_RATIO;
     // x: eskiden neredeyse tamami slayt disina taşiyordu (bkz. kullanici
     // bildirimi: "hala sayfa dışında kalıyor") - artik gorselin yaklasik
     // yarisi slayt icinde gorunur kalacak sekilde saga kaydirildi.
     s2.addImage({
-      data: cornerMesh, x: -cmW * 0.42, y: yBot + (botH - cmH) / 2, w: cmW, h: cmH,
+      data: cornerMesh, x: -cmW * 0.42, y: sol.yBot + (sol.botH - cmH) / 2, w: cmW, h: cmH,
       transparency: 45, flipH: true,
     });
   }
 
-  drawCard(G.X_L, CARDS_TOP, sections.done, SEC.done, fsByKey.done, topH);
-  drawCard(G.X_L, yBot, sections.risk, SEC.risk, fsByKey.risk, botH);
-  drawCard(G.X_R, CARDS_TOP, sections.active, SEC.active, fsByKey.active, topH);
-  drawCard(G.X_R, yBot, sections.pending, SEC.pending, fsByKey.pending, botH);
+  drawCard(G.X_L, CARDS_TOP, sections.done, SEC.done, fsByKey.done, sol.topH);
+  drawCard(G.X_L, sol.yBot, sections.risk, SEC.risk, fsByKey.risk, sol.botH);
+  drawCard(G.X_R, CARDS_TOP, sections.active, SEC.active, fsByKey.active, sag.topH);
+  drawCard(G.X_R, sag.yBot, sections.pending, SEC.pending, fsByKey.pending, sag.botH);
 
   return s2;
 }
