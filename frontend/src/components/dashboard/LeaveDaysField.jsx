@@ -10,6 +10,7 @@ import {
   deleteLeavePeriod,
 } from "../../lib/apiClient";
 import { periodDays, sumFractionsInWindow } from "../../lib/leaveDays";
+import { otomatikTatilMi } from "../../lib/autoApplyCompanyHolidays";
 
 function formatRange(p) {
   const fmt = (iso) => {
@@ -41,7 +42,7 @@ function focusTileField(e) {
  * surum duz beyaz kutu + minik metin butonlardan olusuyordu (kullanici
  * bildirimi, 2026-08-21: "çok dümdüz js gibi duruyor").
  */
-export default function LeaveDaysField({ teamId, fullName, role, onTotalChange, reportDate = null, periodEnd = null }) {
+export default function LeaveDaysField({ teamId, fullName, role, onTotalChange, reportDate = null, periodEnd = null, ignoreAutoHolidays = false }) {
   const [open, setOpen] = useState(false);
   const [teamMemberId, setTeamMemberId] = useState(null);
   const [leaves, setLeaves] = useState(null); // null = henuz yuklenmedi
@@ -75,7 +76,19 @@ export default function LeaveDaysField({ teamId, fullName, role, onTotalChange, 
   // gecmis izinler zaten "Geçen İş Günü" icinde sayiliyor (bkz. leaveDays.js
   // sumFractionsInWindow ve kullanici bildirimi 2026-08-20: izin gunu gectikten
   // sonra kisi eski kapasite seviyesine geri donmeli).
-  const total = leaves ? sumFractionsInWindow(leaves, reportDate, periodEnd) : 0;
+  // ignoreAutoHolidays: Excel akisinda (PersonMappingTable) sirket takviminden
+  // OTOMATIK kopyalanmis tatil gunleri kapasiteden DUSULMEZ - Excel'in "Kalan
+  // İş Günü" degeri bu gunleri zaten dusuyor, bir kez daha dusulurse ayni
+  // gunler iki kez sayilir (kullanici bildirimi 2026-08-26: kapasite 94 yerine
+  // 87 gorunuyordu). Kullanicinin ELLE ekledigi izinler her iki akista da
+  // dusulmeye devam eder. Manuel Gir (MemberCard) bu bayragi vermez, orada
+  // kapasite Excel'den gelmedigi icin dusum dogrudur.
+  const sayilanIzinler = leaves
+    ? ignoreAutoHolidays
+      ? leaves.filter((l) => !otomatikTatilMi(l))
+      : leaves
+    : null;
+  const total = sayilanIzinler ? sumFractionsInWindow(sayilanIzinler, reportDate, periodEnd) : 0;
 
   useEffect(() => {
     onTotalChange?.(total);

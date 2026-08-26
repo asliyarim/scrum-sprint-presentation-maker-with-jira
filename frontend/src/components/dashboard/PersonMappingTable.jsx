@@ -59,6 +59,10 @@ export default function PersonMappingTable({ persons, onUpdate, teamId, reportDa
               fullName={p.name}
               role={p.role}
               reportDate={reportDate}
+              // Excel kaynaginda sirket tatilleri kapasiteden DUSULMEZ -
+              // Excel'in "Kalan İş Günü" degeri onlari zaten dusuyor
+              // (bkz. LeaveDaysField.ignoreAutoHolidays).
+              ignoreAutoHolidays
               onTotalChange={(total) => {
                 if (total !== (p.leaveDays || 0)) onUpdate(i, { leaveDays: total });
               }}

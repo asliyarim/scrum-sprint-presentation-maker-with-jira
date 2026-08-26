@@ -58,7 +58,6 @@ import { useCoverBackground } from "./hooks/useCoverBackground";
 import { useVelocityBurndown } from "./hooks/useVelocityBurndown";
 import { useSectorOptions } from "./hooks/useSectorOptions";
 
-import { autoApplyCompanyHolidays } from "./lib/autoApplyCompanyHolidays";
 import { sectionDefs, SECTION_KEYS } from "./lib/geometry";
 import { buildFullDeck } from "./lib/fullDeckBuilder";
 import { ASSETS } from "./assets/pptxAssets";
@@ -667,33 +666,21 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
       .finally(() => setJiraSyncing(false));
   };
 
-  // Excel'deki Toplam/Tamamlanan sayilari sirket tatilleri ZATEN dusulmus
-  // sekilde hazirlaniyor (bkz. kullanici bildirimi) - bu yuzden Excel
-  // yuklendiginde, her kisi icin sirket takvimindeki tatil gunleri otomatik
-  // izin kaydi olarak eklenir (kullanicinin her satirda "İzin Ekle" acip
-  // tek tek secmesine gerek kalmaz). "Manuel Gir" kaynaginda AYNI otomatik
-  // ekleme artik MemberCard.jsx'te (ad soyad alanindan blur oldugunda, TEK
-  // kisi icin) yapiliyor - burada TUM listeyi kapsayan bir effect'e gerek
-  // yok, cunku Manuel Gir'de kisiler teker teker eklenir (bkz. kullanici
-  // bildirimi, 2026-08-21: "bu izinle kişi manuel eklenirken zaten otomatik
-  // gelmesi lazım" - eskiden BILEREK tetiklenmiyordu, kullanici artik bunu
-  // istiyor).
-  // autoHolidaysKeyRef: ayni kisi listesi icin (orn. render sirasinda persons
-  // referansi degisse bile ad listesi ayniysa) TEKRAR calismasini engeller.
-  const autoHolidaysKeyRef = useRef(null);
-  useEffect(() => {
-    if (dashSource !== "excel" || !dashboard.loaded || !saveTeamId || !dashboard.persons.length) return;
-    const key = saveTeamId + "|" + dashboard.persons.map((p) => p.name).join("|");
-    if (autoHolidaysKeyRef.current === key) return;
-    autoHolidaysKeyRef.current = key;
-    autoApplyCompanyHolidays(dashboard.persons, saveTeamId).then((totals) => {
-      if (!totals.size) return;
-      dashboard.persons.forEach((p, i) => {
-        const total = totals.get(p.name);
-        if (total != null && total !== (p.leaveDays || 0)) dashboard.updatePerson(i, { leaveDays: total });
-      });
-    });
-  }, [dashSource, dashboard.loaded, dashboard.persons, saveTeamId]);
+  // NOT: Excel kaynaginda sirket tatilleri ARTIK otomatik uygulanmaz.
+  //
+  // Eskiden burada bir effect vardi: Excel yuklenince sirket takvimindeki
+  // tatil gunleri (SIRKET_TATILI) her kisiye izin kaydi olarak yazilip
+  // kapasiteden dusuluyordu. Ama Excel'in "Kalan İş Günü" degeri bu gunleri
+  // ZATEN dusuyor (145 gunluk "Şirket İş Günü" parametresinden hesaplaniyor;
+  // kisisel izinler de Excel'in kendi "İzin" kolonunda). Yani ayni gunler iki
+  // kez dusuluyordu: Is Zekasi 4. sprintte kapasite 94 yerine 87, Kapasite
+  // Farkı -170,05 yerine -198,10 cikiyordu (kullanici bildirimi 2026-08-26,
+  // PO'nun Excel'i ve yayimlanan sunumuyla karsilastirilarak dogrulandi).
+  //
+  // "Manuel Gir" kaynagindaki otomatik ekleme YERINDE DURUYOR (bkz.
+  // MemberCard.jsx) - orada kapasite Excel'den gelmedigi icin cifte dusum
+  // sozkonusu degil. Excel modunda PO elle "İzin Ekle" ile izin girerse o
+  // izin kapasiteden dusulmeye devam eder.
 
   useEffect(() => {
     if (!presentationId) return;

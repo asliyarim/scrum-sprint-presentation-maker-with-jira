@@ -26,6 +26,28 @@ import { sumFractions } from "./leaveDays";
  * @returns {Promise<Map<string, number>>} kisi adi -> toplam izin gunu (persons
  *   dizisindeki leaveDays alanini guncellemek icin cagiran taraf kullanir)
  */
+/**
+ * Bu fonksiyonun olusturdugu izin kayitlarinin aciklamasi - kaydin "elle
+ * girilmis" mi yoksa "sirket takviminden otomatik kopyalanmis" mi oldugunu
+ * ayirt etmeye yarar. Excel akisi bu kayitlari kapasiteden DUSMEZ (Excel'in
+ * "Kalan İş Günü" degeri sirket tatillerini zaten dusuyor), Manuel Gir akisi
+ * ise duser - bkz. LeaveDaysField.ignoreAutoHolidays.
+ */
+export const OTOMATIK_TATIL_ACIKLAMASI = "Şirket takviminden otomatik eklendi";
+
+/**
+ * Bir izin kaydi bu fonksiyon tarafindan otomatik mi olusturulmus?
+ *
+ * ONEK ile karsilastirilir, tam esitlikle DEGIL: veritabaninda kodun eski bir
+ * surumunden kalma "... (Excel yükleme)" ekli kayitlar da var (lokalde 60
+ * adet). Tam esitlik arayan ilk deneme bunlari kaciriyordu ve Excel akisinda
+ * tatiller yine kapasiteden dusuluyordu (kullanici bildirimi 2026-08-26:
+ * "2 günlük izin ekledim, 8 gün düştü").
+ */
+export function otomatikTatilMi(izin) {
+  return String(izin?.description || "").startsWith(OTOMATIK_TATIL_ACIKLAMASI);
+}
+
 export async function autoApplyCompanyHolidays(persons, teamId) {
   const totals = new Map();
   if (!teamId || !persons?.length) return totals;
@@ -51,7 +73,7 @@ export async function autoApplyCompanyHolidays(persons, teamId) {
         await createLeavePeriod({
           name: h.name, type: "YILLIK_IZIN", scope: "TEAM_MEMBER", teamMemberId: member.id,
           startDate: h.startDate, endDate: h.endDate, dayFraction: h.dayFraction,
-          description: "Şirket takviminden otomatik eklendi",
+          description: OTOMATIK_TATIL_ACIKLAMASI,
         });
       }
 
