@@ -578,9 +578,22 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   // dashboard'u gosterilir - aksi halde kullanicinin bu oturumda yukledigi
   // Excel/manuel/Jira verisi (dashboard.dashData) baska takimin slaydina sizardi.
   const viewingOtherTeam = !canEdit && readOnlyView != null;
+  //
+  // HER kaynak icin son care KAYITLI dashboard'dur (loadedDashData). Eskiden
+  // bu yedek SADECE excel dalinda vardi; manuel/Jira kaynakli kayitli bir sunum
+  // acildiginda (sol formun durumu geri yuklenmedigi icin manual.dashData /
+  // jiraDash.dashData null kalir) Kapasite Dashboard BOS goruluyordu - oysa
+  // kayitta veri duruyordu. PO bu haldeyken "Kaydet"e basarsa BOS dashboard
+  // yeni surum olarak yazilir ve o surumdeki veri kaybolur (kullanici bildirimi
+  // 2026-08-26, Gözde Son: "sunumlarim kisminda duzenleye basinca dashboard
+  // kayboluyor, sonra bos kaydediliyor").
   const activeDashDataBase = viewingOtherTeam
     ? loadedDashData
-    : dashSource === "manual" ? manual.dashData : dashSource === "jira" ? jiraDash.dashData : (dashboard.dashData || loadedDashData);
+    : dashSource === "manual"
+      ? (manual.dashData || loadedDashData)
+      : dashSource === "jira"
+        ? (jiraDash.dashData || loadedDashData)
+        : (dashboard.dashData || loadedDashData);
 
   // Canlı önizlemedeki "Düzenle" ekraninin (DashboardEditModal) uzerine
   // yazdigi GECICI kaplama - gercek work_items/team_members'i DEGISTIRMEZ,
