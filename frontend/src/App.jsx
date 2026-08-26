@@ -43,6 +43,7 @@ import DashboardPage from "./components/dashboard/DashboardPage";
 import DashboardTopActions from "./components/dashboard/DashboardTopActions";
 import DashboardSlideCanvas from "./components/dashboard/DashboardSlideCanvas";
 import DashboardEditModal from "./components/dashboard/DashboardEditModal";
+import { mergeDashOverride, personKeys } from "./lib/dashOverride";
 
 import { useSprintForm } from "./hooks/useSprintForm";
 import { useBandEditor } from "./hooks/useBandEditor";
@@ -450,7 +451,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
     if (replace || c.band?.bars?.length) band.setSample(c.band?.bars || []);
     // setSample(bars) show'u true yapar - kayitta gizliyse hemen geri kapatilir.
     if (c.band ? c.band.show === false : replace) band.toggleShow(false);
-    if (replace || c.dashSource) setDashSource(c.dashSource || "excel");
+    if (replace || c.dashSource) { setDashSource(c.dashSource || "excel"); clearDashOverride(); }
     if (replace || c.dashData) {
       setLoadedDashData(c.dashData || null);
       setTableHeaders(c.dashData?.tableHeaders || null);
@@ -584,17 +585,40 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   // Canlı önizlemedeki "Düzenle" ekraninin (DashboardEditModal) uzerine
   // yazdigi GECICI kaplama - gercek work_items/team_members'i DEGISTIRMEZ,
   // sadece bu sunumun kaydedilecek versiyonuna (buildSaveContent -> dashData)
-  // yansir. Veri kaynagi YENIDEN hesaplanirsa (activeDashDataBase referansi
-  // degisirse - Jira "Yenile", Excel yeniden yukleme, Manuel "Hesapla")
-  // asagidaki effect ile otomatik sifirlanir (bkz. kullanici bildirimi,
-  // 2026-08-17: "bu değişiklikler sadece versiyon tablosuna kaydedilsin").
+  // yansir (bkz. kullanici bildirimi 2026-08-17: "bu değişiklikler sadece
+  // versiyon tablosuna kaydedilsin").
+  //
+  // Sekli { data, baseNames } - baseNames, "Uygula"ya basildigi ANDA tabanda hangi
+  // kisilerin bulundugunu tutar; rotusta olup tabanda olmayan bir kisinin
+  // Düzenle icinden EKLENDIGINI mi yoksa sol formdan SILINDIGINI mi ayirt
+  // etmek icin gerekir (bkz. mergeDashOverride).
   const [dashDataOverride, setDashDataOverride] = useState(null);
-  useEffect(() => {
-    setDashDataOverride(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDashDataBase]);
 
-  const effectiveDashDataBase = dashDataOverride || activeDashDataBase;
+  /**
+   * "Düzenle" rotuslarini TAMAMEN siler - yalnizca kullanicinin BILINCLI
+   * olarak veri kaynagini tazeledigi anlarda cagrilir: yeni Excel
+   * yuklendiginde, Jira'dan cekildiginde, veri kaynagi sekmesi degistiginde
+   * ve kayitli baska bir sunum acildiginda. Sol formdaki siradan
+   * duzenlemeler rotusu SILMEZ, uzerine BIRLESIR (bkz. mergeDashOverride).
+   *
+   * ESKIDEN bu bir effect'ti ve activeDashDataBase her DEGISTIGINDE
+   * tetikleniyordu. Manuel Gir'de her tus vurusundan 700 ms sonra otomatik
+   * hesaplama calistigi icin (bkz. useManualDashboard AUTO_COMPUTE_DEBOUNCE_MS)
+   * bu, PO'nun Düzenle'de girdigi butun degerleri sol formdaki TEK bir harf
+   * yuzunden - hatta baska bir kisinin alanina yazsa bile - siliyordu
+   * (kullanici bildirimleri 2026-08-26: "manuel kişi ekleme yaparken habire
+   * siliniyor", "evet siliniyor").
+   */
+  const clearDashOverride = () => setDashDataOverride(null);
+
+  // Rotus tabani EZMEZ, tabanla BIRLESIR: kim var sorusunun cevabi tabandan
+  // (sol formdan eklenen yeni kisi slayta duser), o kisinin degerleri ise
+  // rotustan gelir (PO nun girdigi rakamlar sol formdaki degisiklikle
+  // silinmez). Ayrintili gerekce icin bkz. lib/dashOverride.mergeDashOverride.
+  const effectiveDashDataBase = useMemo(
+    () => mergeDashOverride(activeDashDataBase, dashDataOverride, dashTeamBakimOrani),
+    [activeDashDataBase, dashDataOverride, dashTeamBakimOrani],
+  );
   // Henuz hicbir veri kaynagi hesaplanmamisken (Manuel Gir'de "Hesapla"
   // basilmadi, Excel yuklenmedi vb. - effectiveDashDataBase null) ESKIDEN
   // tableHeaders BURADA tamamen kaybediliyordu (asagidaki satir hicbir sey
@@ -656,6 +680,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
           text: "Jira senkronizasyonu başlatıldı — veriler birkaç saniye içinde otomatik güncellenecek.",
         });
         setTimeout(() => {
+          clearDashOverride(); // Jira'dan taze veri geldi
           jiraDash.refresh();
           jiraContent.fetchFromJira(saveTeamId, saveTeamJiraProjectKey);
         }, JIRA_SYNC_AUTO_REFRESH_DELAY_MS);
@@ -998,6 +1023,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
       manual.clearEntries();
     }
     setDashSource("excel");
+    clearDashOverride(); // yeni Excel = bilincli tazeleme
     excel.loadFile(file, sprintForm.team, applyExcelMeta);
     dashboard.loadFile(file, applyExcelMeta);
     setExcelFileName(file.name);
@@ -1225,7 +1251,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
           onEdit={canEdit ? () => setDashEditOpen(true) : null}
           showDataSource={mode === "dash" && canEdit}
           dataSource={dashSource}
-          onDataSourceChange={setDashSource}
+          onDataSourceChange={(src) => { clearDashOverride(); setDashSource(src); }}
           burndownUrl={velocityBurndown.burndown.url}
           velocityUrl={velocityBurndown.velocity.url}
           burndownZoomX={velocityBurndown.burndown.zoomX}
@@ -1248,7 +1274,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
         open={dashEditOpen}
         onClose={() => setDashEditOpen(false)}
         dashData={activeDashData}
-        onApply={setDashDataOverride}
+        onApply={(data) => setDashDataOverride({ data, baseNames: personKeys(activeDashDataBase?.persons) })}
         hasFte={hasFteTracking(sprintForm.teamType)}
         teamBakimOrani={dashTeamBakimOrani}
       />

@@ -4,6 +4,7 @@ import Button from "../shared/Button";
 import { IconEdit, IconCheckCircle, IconRocket, IconPlusCircle } from "../shared/icons";
 import { sanitizeDecimalInput, sanitizeIntegerInput, DAV_COLORS, initialsOf, bakimOraniOf, bakimHaricKapasiteOf, VARSAYILAN_BAKIM_ORANI } from "../../lib/format";
 import { emptyDashData } from "../../lib/emptyDashData";
+import { computeKpisFromPersons } from "../../lib/dashOverride";
 
 const DURUM_OPTIONS = ["Uygun", "Dikkat", "Risk", "Yüksek Risk"];
 
@@ -17,50 +18,6 @@ function emptyPerson() {
 function num(v) {
   const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) ? n : 0;
-}
-
-/**
- * "Ekip Özet" KPI'larini KISI SATIRLARINDAN hesaplar - PO notu 2026-08-19:
- * "Alttaki verileri hesaplayıp yukarıya yazsak daha uygun olmaz mı? Bu şekilde
- * veri doğruluğu sapabilir." Eskiden ust bloktaki 6 KPI da elle giriliyordu ve
- * alttaki kisi satirlariyla tutarsiz kalabiliyordu (orn. Toplam İş Yükü 120
- * yazarken satirlarin toplami 280).
- *
- * Toplamlar dogrudan sutun toplamidir. "Kapasite %" ise kisi satirlarindaki
- * kendi doluluk degerlerinin KAPASITEYE GORE AGIRLIKLI ortalamasidir - boylece
- * kisiye ozel bakim orani (bakimOrani) gibi satira zaten islenmis duzeltmeler
- * korunur, burada yeni bir formul uydurulmaz. Kapasite toplami 0 ise duz
- * ortalamaya duser.
- */
-function computeKpisFromPersons(persons, currentDurum, varsayilanOran) {
-  const list = persons || [];
-  const sum = (key) => list.reduce((acc, p) => acc + num(p[key]), 0);
-  const toplam = sum("toplam");
-  const tamamlanan = sum("tamamlanan");
-  const acik = sum("acik");
-  const kapasite = sum("kapasite");
-
-  let doluluk = 0;
-  if (list.length) {
-    const weightTotal = list.reduce((acc, p) => acc + num(p.kapasite), 0);
-    doluluk = weightTotal > 0
-      ? list.reduce((acc, p) => acc + num(p.doluluk) * num(p.kapasite), 0) / weightTotal
-      : list.reduce((acc, p) => acc + num(p.doluluk), 0) / list.length;
-  }
-
-  // Kapasite Farkı = Bakım Hariç Kalan Kapasite − Kalan (Açık) Efor.
-  // PO Excel'indeki hucre formulunun aynisi (Rapor!B32 = B26 − B22, dosya
-  // incelemesi 2026-08-20). Satir basina taban icin bkz. bakimHaricKapasiteOf:
-  // eskiden "bakimliKapasite dolu ise oldugu gibi al" deniyordu, ama Excel
-  // akisinda bu alan ham kapasiteye ESIT kaydediliyordu (bakim hic dusulmemis)
-  // ve Kapasite Farkı olmasi gerekenden iyimser cikiyordu.
-  const bakimHaricKapasite = list.reduce((acc, p) => acc + bakimHaricKapasiteOf(p, varsayilanOran), 0);
-
-  return {
-    toplam, tamamlanan, acik, kapasite, doluluk,
-    acikFazla: bakimHaricKapasite - acik,
-    durum: currentDurum || "Uygun",
-  };
 }
 
 /**
