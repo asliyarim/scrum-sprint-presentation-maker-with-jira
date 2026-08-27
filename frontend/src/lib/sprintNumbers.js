@@ -41,3 +41,27 @@ export function nextSprintNo(presentations) {
   const latest = latestSprintNo(presentations);
   return String(latest == null ? 1 : latest + 1);
 }
+
+/**
+ * Sunum listesini SPRINT NUMARASINA gore siralar (yeni bir dizi doner, girdi
+ * degistirilmez).
+ *
+ * sprint_no METIN oldugu icin duz siralama yaniltir ("10" < "9"); once sayiya
+ * cevrilir. Sayiya cevrilemeyen kayitlar (orn. "50-b") listenin SONUNA konur
+ * ve kendi aralarinda metin olarak siralanir - kaybolmasinlar.
+ *
+ * @param azalan true (varsayilan) ise buyukten kucuge - "Sunumlarım"da en
+ *   guncel sprint en ustte olsun diye. Toplu PPTX indirmede ise sunum
+ *   kronolojik olmali, orada azalan=false ile cagrilir.
+ */
+export function sortBySprintNo(presentations, azalan = true) {
+  const yon = azalan ? -1 : 1;
+  return [...(presentations || [])].sort((a, b) => {
+    const na = parseSprintNo(a?.sprintNo);
+    const nb = parseSprintNo(b?.sprintNo);
+    if (na != null && nb != null) return (na - nb) * yon;
+    if (na != null) return -1;
+    if (nb != null) return 1;
+    return String(a?.sprintNo || "").localeCompare(String(b?.sprintNo || ""));
+  });
+}

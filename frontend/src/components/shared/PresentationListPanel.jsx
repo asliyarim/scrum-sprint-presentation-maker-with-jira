@@ -10,6 +10,7 @@ import DashboardSlideCanvas from "../dashboard/DashboardSlideCanvas";
 import VelocityBurndownSlideCanvas from "../sprint/VelocityBurndownSlideCanvas";
 import { IconPresentation, IconHistory, IconEdit, IconCalendar, IconDownload } from "./icons";
 import { fetchPresentations, fetchPresentation, fetchPresentationVersions, rollbackPresentation, recordPresentationDownload } from "../../lib/apiClient";
+import { sortBySprintNo } from "../../lib/sprintNumbers";
 import { sprintDataFromContent } from "../../lib/presentationContent";
 import { buildFullDeck } from "../../lib/fullDeckBuilder";
 import { buildTeamAllSprintsDeck } from "../../lib/teamDeckBuilder";
@@ -59,7 +60,11 @@ export default function PresentationListPanel({ teamId, teamName, canManage, sho
     setError(null);
     if (!keepSelectedId) setSelectedId(null);
     fetchPresentations(teamId)
-      .then(setPresentations)
+      // Backend siralama garantisi VERMEZ (findByTeamId'de ORDER BY yok), bu
+      // yuzden liste rastgele sirada geliyordu - "Sprint 5, Sprint 4, Sprint 6"
+      // gibi (kullanici bildirimi 2026-08-27: "Sprint sayisina gore siralamayi
+      // yapabilir miyiz?"). En guncel sprint en ustte olsun diye AZALAN.
+      .then((liste) => setPresentations(sortBySprintNo(liste)))
       .catch((err) => setError(err?.message || "Sunumlar yüklenemedi."))
       .finally(() => setLoading(false));
   };
@@ -145,11 +150,8 @@ export default function PresentationListPanel({ teamId, teamName, canManage, sho
     setError(null);
     try {
       const fulls = await Promise.all(presentations.map((p) => fetchPresentation(p.id)));
-      const sorted = [...fulls].sort((a, b) => {
-        const na = parseInt(a.sprintNo, 10), nb = parseInt(b.sprintNo, 10);
-        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-        return (a.sprintNo || "").localeCompare(b.sprintNo || "");
-      });
+      // Sunum kronolojik olmali: burada ARTAN (1, 2, 3...).
+      const sorted = sortBySprintNo(fulls, false);
       const sprints = sorted.map((p) => ({
         sprintData: sprintDataFromContent(p.content || {}),
         dashData: p.content?.dashData || null,

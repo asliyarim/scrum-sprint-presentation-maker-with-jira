@@ -8,13 +8,17 @@ import { sumFractions } from "./leaveDays";
  * LeaveDaysField'daki popover yine de acilir ve bu kayitlari "zaten eklenmis"
  * olarak gosterir/duzenlemeye izin verir.
  *
- * İKİ cagiran nokta var: Excel yuklendiginde TUM kisi listesi icin birden
+ * TEK cagiran nokta var: Excel yuklendiginde TUM kisi listesi icin birden
  * (bkz. App.jsx - Excel'deki Toplam/Tamamlanan sayilari zaten bu tatiller
- * dusulmus sekilde hazirlandigi icin) VE Manuel Gir'de bir kisinin adi
- * girilip alandan cikildiginda TEK kisi icin (bkz. MemberCard.jsx onBlur -
- * kullanici bildirimi, 2026-08-21: "bu izinle kişi manuel eklenirken zaten
- * otomatik gelmesi lazım" - eskiden Manuel Gir'de bu BILEREK tetiklenmiyordu,
- * kullanici artik bunu istiyor).
+ * dusulmus sekilde hazirlandigi icin kapasiteden BIR DAHA dusulmez, bkz.
+ * LeaveDaysField.ignoreAutoHolidays).
+ *
+ * Manuel Gir bu fonksiyonu ARTIK CAGIRMIYOR. Bir donem cagiriyordu
+ * (MemberCard.jsx onBlur, 2026-08-21 talebi) ama kisi eklenir eklenmez
+ * kapasiteyi tatiller kadar dusuruyor, istemeyen PO izinleri tek tek elle
+ * silmek zorunda kaliyordu - bkz. MemberCard.jsx'teki not (kullanici
+ * bildirimi 2026-08-27). Orada tatiller artik "İzin Ekle" penceresindeki
+ * "ŞİRKET TAKVİMİNDEN EKLE" bolumunden ELLE eklenir.
  *
  * Zaten eklenmis (ayni start/end tarihli) kayitlar TEKRAR eklenmez - Excel
  * yeniden yuklenirse/ayni isim tekrar blur olursa kopya olusturulmaz.
