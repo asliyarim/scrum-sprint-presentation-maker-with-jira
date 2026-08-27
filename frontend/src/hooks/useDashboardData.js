@@ -178,6 +178,27 @@ export function useDashboardData(dTeam, setDTeam, dSprint, setDSprint, teamType,
   // ismi donup kalmasin, kapak sayfasindaki gibi guncel degeri yansitsin.
   const info = useMemo(() => {
     if (!loaded) return BASE_INFO;
+    // Rapor Tarihi okunamadiysa ACIKCA soyle. Eskiden sessizce bos geciliyor,
+    // slaytta kalici olarak "–" goruluyordu; PO ne oldugunu anlamiyor ve
+    // duzeltemiyordu (kullanici bildirimi 2026-08-26, Gözde Son: "rapor tarihi
+    // alaninda genel bir sorun var duzeltmiyor hicbirini").
+    //
+    // Cozum neden arayuzde DUZENLENEBILIR bir alan DEGIL: Excel akisinda
+    // kapasite bizim hesabimiz degil, dosyadan OKUNUYOR ve Excel'in kendi
+    // rapor tarihine gore hesaplanmis durumda. Arayuzden tarihi degistirmek
+    // slayttaki etiketi degistirir ama kapasiteleri degistirmez; ustelik izin
+    // penceresinin alt siniri da rapor tarihi oldugu icin kapasite KISMEN
+    // kayardi - ne Excel'in ne bizim hesabimiz olan tutarsiz bir sayi cikardi.
+    // Dogru cozum dosyayi duzeltip yeniden yuklemek, o yuzden PO'ya bunu
+    // soyluyoruz.
+    if (!meta.reportDate) {
+      return (
+        `Excel okundu — ${dTeam.trim() || meta.team} · ${persons.length} kişi. ` +
+        "⚠ Rapor Tarihi okunamadı: dosyanın \"Rapor\" sayfasında ilk sütunda \"Rapor Tarihi\" yazan " +
+        "satır yok ya da yanındaki hücre boş. Kapasite bu tarihe göre hesaplandığı için tarihi " +
+        "Excel'de düzeltip dosyayı yeniden yükleyin — aksi halde slaytta boş görünür."
+      );
+    }
     return (
       `Excel okundu — ${dTeam.trim() || meta.team} · ${persons.length} kişi · Rapor Tarihi ${meta.reportDate}. ` +
       "Aşağıdan ad/rol ve Tamamlanan değerlerini girin (Açık = Toplam − Tamamlanan otomatik)."

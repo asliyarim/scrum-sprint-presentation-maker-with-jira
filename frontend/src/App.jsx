@@ -452,6 +452,10 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
     // setSample(bars) show'u true yapar - kayitta gizliyse hemen geri kapatilir.
     if (c.band ? c.band.show === false : replace) band.toggleShow(false);
     if (replace || c.dashSource) { setDashSource(c.dashSource || "excel"); clearDashOverride(); }
+    // Sol formu geri yukle. Uyesi olmayan anlik goruntu yok sayilir (bkz.
+    // useManualDashboard.restore) - Excel/Jira kaynakli sunumlarda sol form
+    // bosaltilmasin ve kayitli dashboardun onune bos bir hesap gecmesin.
+    manual.restore(c.manualState);
     if (replace || c.dashData) {
       setLoadedDashData(c.dashData || null);
       setTableHeaders(c.dashData?.tableHeaders || null);
@@ -774,6 +778,12 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
     band: { show: band.show, bars: band.bars },
     dashSource,
     dashData: activeDashData,
+    // Manuel Girdeki SOL FORMUN girdileri (uyeler, is kalemleri, donem,
+    // rapor tarihi, bakim orani, ek gostergeler). Eskiden sadece hesaplanmis
+    // SONUC (dashData) kaydediliyordu; girdiler kaydedilmedigi icin sunum
+    // yeniden acildiginda sol form bos geliyordu - bkz.
+    // useManualDashboard.snapshot yorumundaki kullanici bildirimleri.
+    manualState: manual.snapshot(),
     timerMinutes,
     // Eskiden "oturuma ozel" olup HICBIR ZAMAN kaydedilmiyordu (bkz.
     // useVelocityBurndown.js) - bu yuzden Ortak Sunum baska bir PO'nun

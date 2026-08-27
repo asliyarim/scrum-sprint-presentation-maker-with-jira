@@ -202,6 +202,61 @@ export function useManualDashboard(team, setTeam, sprintNo, setSprintNo, teamTyp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team, sprintNo, period, previousSnapshotDate, maintenanceAllocationPercent, members, workItems, customKpis]);
 
+  /**
+   * Sol formun TAM durumu (donem, rapor tarihi, bakim orani, uyeler, is
+   * kalemleri, ek gostergeler) - kayitli sunumun contentine gomulur, bkz.
+   * App.jsx buildSaveContent.
+   *
+   * Eskiden SADECE hesaplanmis SONUC (dashData) kaydediliyordu, GIRDILER
+   * kaydedilmiyordu. Bu yuzden manuel girisle hazirlanan bir sunum yeniden
+   * acildiginda sol form BOS geliyor ve pes pese sikayet uretiyordu
+   * (kullanici bildirimleri 2026-08-26):
+   *   - "kaydettikten sonra manuel giris alanini tekrar goremiyorum, nerede
+   *      hata yaptim diye donup bakamiyorum"
+   *   - "hesapla dedigimde bir degisiklik yapmiyor"  (uye listesi bos)
+   *   - "rapor tarihi alaninda genel bir sorun var, duzeltmiyor hicbirini"
+   *   - "ust bardaki kartlarda yanlis olanlar duzelmiyor"
+   * Dordu de ayni eksigin farkli gorunumleriydi.
+   *
+   * Excel akisinda bu sorun yasanmiyordu cunku orada GIRDI Excel dosyasinin
+   * kendisi - PO dosyayi tekrar yukleyebiliyordu. Manuel akista boyle bir
+   * kaynak yok, o yuzden girdinin kendisi saklanmali.
+   */
+  const snapshot = () => ({
+    period,
+    previousSnapshotDate,
+    maintenanceAllocationPercent,
+    members,
+    workItems,
+    customKpis,
+  });
+
+  /**
+   * snapshot()in tersi. IKI korumasi var:
+   *
+   * 1) Uyesi olmayan anlik goruntu GERI YUKLENMEZ. Aksi halde Excel/Jira
+   *    kaynakli bir sunum acilirken sol form bosaltilir, ardindan otomatik
+   *    hesaplama sifirlarla calisip kayitli dashboardun onune gecerdi.
+   *    (Otomatik hesaplama zaten members.length === 0 iken calismaz - bkz.
+   *    validationIssue - ama burada da acikca korunuyor.)
+   * 2) clientIdler modul duzeyinde artan sayilar. Geri yuklenen kayitlarin
+   *    numaralari, ayni oturumda sonradan eklenecek yeni satirlarla
+   *    CAKISMASIN diye sayac en buyugun uzerine tasinir.
+   */
+  const restore = (snap) => {
+    if (!snap || !Array.isArray(snap.members) || snap.members.length === 0) return;
+    const ids = [...snap.members, ...(Array.isArray(snap.workItems) ? snap.workItems : [])]
+      .map((x) => Number(x?.clientId))
+      .filter(Number.isFinite);
+    if (ids.length) clientIdSeq = Math.max(clientIdSeq, Math.max(...ids) + 1);
+    if (snap.period) setPeriod(snap.period);
+    setPreviousSnapshotDate(snap.previousSnapshotDate || "");
+    if (snap.maintenanceAllocationPercent != null) setMaintenanceAllocationPercent(String(snap.maintenanceAllocationPercent));
+    setMembers(snap.members);
+    setWorkItems(Array.isArray(snap.workItems) ? snap.workItems : []);
+    setCustomKpis(Array.isArray(snap.customKpis) ? snap.customKpis : []);
+  };
+
   return {
     team, setTeam, sprintNo, setSprintNo,
     period, setPeriod, previousSnapshotDate, setPreviousSnapshotDate,
@@ -212,6 +267,7 @@ export function useManualDashboard(team, setTeam, sprintNo, setSprintNo, teamTyp
     statuses,
     customKpis, addCustomKpi, updateCustomKpi, removeCustomKpi,
     dashData, loading, error, compute,
+    snapshot, restore,
     hasFte: hasFteTracking(teamType),
   };
 }
