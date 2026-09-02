@@ -1,6 +1,7 @@
 package com.aksa.capacityplanner.common.web;
 
 import com.aksa.capacityplanner.asset.adapter.out.storage.StorageException;
+import com.aksa.capacityplanner.common.domain.ConflictException;
 import com.aksa.capacityplanner.common.domain.DomainValidationException;
 import com.aksa.capacityplanner.common.domain.NotFoundException;
 import com.aksa.capacityplanner.document.adapter.out.storage.DocumentStorageException;
@@ -18,6 +19,11 @@ import java.time.Instant;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleConflict(ConflictException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), request);
+    }
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleNotFound(NotFoundException ex, HttpServletRequest request) {

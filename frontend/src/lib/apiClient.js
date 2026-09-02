@@ -234,10 +234,12 @@ export async function fetchPresentation(id) {
  * olarak günceller (bkz. backend PresentationService.upsert). Yetkisiz
  * takıma yazma denemesi 403 fırlatır (backend PresentationFacade).
  */
-export async function savePresentation({ teamId, sprintNo, dateRange, content }) {
+export async function savePresentation({ id, teamId, sprintNo, dateRange, content }) {
+  // id verilirse (mevcut sunum duzenleniyor) backend o kaydi gunceller; sprint
+  // no degistiyse RENAME eder, yeni kart olusturmaz (bkz. PresentationService.upsert).
   return requestJson("/api/presentations", {
     method: "PUT",
-    body: JSON.stringify({ teamId, sprintNo, dateRange, content }),
+    body: JSON.stringify({ id, teamId, sprintNo, dateRange, content }),
   });
 }
 
@@ -256,6 +258,25 @@ export async function updatePresentationInPlace(id, dateRange, content) {
 /** Bir sunumun versiyon (audit log) geçmişini döner. */
 export async function fetchPresentationVersions(id) {
   return requestJson(`/api/presentations/${id}/versions`);
+}
+
+/**
+ * Belirli bir surumun TAM icerigini (content dahil) doner. fetchPresentationVersions
+ * yalnizca meta (numara/kim/ne zaman) verir; bu ise o surumun sunum icerigini
+ * getirir - Ortak Sunum ekraninda PO nun sectigi surumle sunum hazirlamasi icin.
+ * SALT OKUMA - backend head e/gecmise dokunmaz (bkz. PresentationController.getVersion).
+ */
+export async function fetchPresentationVersion(id, version) {
+  return requestJson(`/api/presentations/${id}/versions/${version}`);
+}
+
+/**
+ * Bir sunumu VE tum surum gecmisini KALICI siler (geri alinamaz). Backend
+ * yalnizca o takima yazma yetkisi olan (ya da admin) kullaniciya izin verir
+ * (bkz. PresentationFacade.delete); yetkisizse 403 doner.
+ */
+export async function deletePresentation(id) {
+  return requestJson(`/api/presentations/${id}`, { method: "DELETE" });
 }
 
 /**

@@ -13,6 +13,9 @@ public interface PresentationUseCase {
 
     SprintPresentation getById(Long id);
 
+    /** Sunumu ve tum surumlerini KALICI siler (V30 CASCADE). Geri alinamaz. */
+    void delete(Long id);
+
     /** Salt-okunur view (bkz. V5 migration) uzerinden okur - baska takim/admin goruntuleme yollarinda kullanilir. */
     List<SprintPresentation> listByTeamReadOnly(Long teamId);
 
@@ -20,7 +23,7 @@ public interface PresentationUseCase {
     SprintPresentation getByIdReadOnly(Long id);
 
     /** Yoksa olusturur (version=1), varsa yeni bir versiyon olarak gunceller. */
-    SprintPresentation upsert(Long teamId, String sprintNo, String dateRange, Map<String, Object> content, String updatedBySicil);
+    SprintPresentation upsert(Long id, Long teamId, String sprintNo, String dateRange, Map<String, Object> content, String updatedBySicil);
 
     /**
      * "Güncelle": YENI bir surum OLUSTURMADAN, mevcut guncel (head) icerigi
@@ -34,6 +37,14 @@ public interface PresentationUseCase {
     SprintPresentation updateInPlace(Long presentationId, String dateRange, Map<String, Object> content, String updatedBySicil);
 
     List<PresentationVersion> listVersions(Long presentationId);
+
+    /**
+     * Belirli bir surumun TAM icerigini (content dahil) doner - Ortak Sunum
+     * ekraninda PO'nun sectigi surumle sunum hazirlamasi icin (bkz. kullanici
+     * bildirimi 2026-08-31). listVersions yalnizca meta (numara/kim/ne zaman)
+     * dondurur; bu ise icerigi tasir. SALT OKUMA - hicbir sey degistirmez.
+     */
+    PresentationVersion getVersion(Long presentationId, int version);
 
     /**
      * "Checkout": guncel surumu (head) dogrudan hedef surumun icerigine/

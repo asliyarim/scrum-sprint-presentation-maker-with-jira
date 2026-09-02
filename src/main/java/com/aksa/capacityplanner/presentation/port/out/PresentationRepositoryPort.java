@@ -8,6 +8,9 @@ import java.util.Optional;
 public interface PresentationRepositoryPort {
     SprintPresentation save(SprintPresentation presentation);
 
+    /** Sunumu siler. FK ON DELETE CASCADE (V30) ile surumleri de gider. */
+    void deleteById(Long id);
+
     Optional<SprintPresentation> findById(Long id);
 
     Optional<SprintPresentation> findByTeamIdAndSprintNo(Long teamId, String sprintNo);

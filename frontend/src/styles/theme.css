@@ -2617,6 +2617,10 @@ header.topbar .btn:hover {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
+  /* Dar panelde 4 aksiyon butonu (Sürüm/Düzenle/PPTX/Sil) satira sigmayip
+     Sil ekran disina tasiyordu; wrap ile sigmayan aksiyon alani alt satira
+     duser (kullanici bildirimi 2026-09-01). */
+  flex-wrap: wrap;
   padding: 16px 20px;
   border-radius: 16px;
   background: var(--glass-bg);
@@ -2731,6 +2735,10 @@ header.topbar .btn:hover {
   display: flex;
   gap: 8px;
   flex: none;
+  /* Dar panelde 4. buton (Sil) satiri asip ekran disina tasiyordu; wrap ile
+     alt satira duser, sağa yasli kalir (kullanici bildirimi 2026-09-01). */
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .version-history-box {
@@ -4606,4 +4614,150 @@ header.topbar .btn:hover {
 }
 .sugg-more:hover {
   background: rgba(74, 159, 224, 0.08);
+}
+
+/* ===== Ortak Sunum: takim -> sprint -> surum secici (accordion) =====
+   Eski checkbox-takim izgarasinin yerini aldi: PO artik her takimin son 10
+   sprintinden istedigini, istedigi surumuyle secebiliyor (bkz. kullanici
+   bildirimi 2026-08-31). Renk/token sistemi joint-team-select-card ile ayni. */
+.joint-picker { display: flex; flex-direction: column; gap: 8px; }
+.joint-picker-team {
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass-bg);
+  overflow: hidden;
+}
+.joint-picker-team.open { border-color: color-mix(in srgb, var(--team-accent, var(--teal2)) 45%, var(--glass-border)); }
+.joint-picker-team-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+  text-align: left;
+}
+.joint-picker-team-head:hover { background: color-mix(in srgb, var(--team-accent, #0d5ea8) 7%, transparent); }
+.joint-picker-caret { color: var(--mut); font-size: 12px; width: 12px; flex: none; }
+.joint-picker-av {
+  width: 28px; height: 28px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 11px; font-weight: 800;
+}
+.joint-picker-team-name { font-weight: 600; flex: 1; }
+.joint-picker-count {
+  font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+  color: #fff; background: var(--team-accent, var(--teal2)); white-space: nowrap;
+}
+.joint-picker-body {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 4px 10px 10px 34px;
+  border-top: 1px solid var(--line);
+}
+.joint-picker-pres { border-radius: 8px; }
+.joint-picker-pres-row { display: flex; align-items: center; gap: 10px; padding: 6px 4px; flex-wrap: wrap; }
+.joint-picker-pres-main {
+  display: flex; align-items: center; gap: 9px; cursor: pointer;
+  flex: 1; min-width: 220px; font-size: 14px; color: var(--ink);
+}
+.joint-picker-pres-main input { cursor: pointer; }
+.joint-picker-sprint { font-weight: 600; }
+.joint-picker-vtag {
+  font-size: 11px; font-weight: 700; color: var(--mut);
+  font-variant-numeric: tabular-nums;
+}
+.joint-picker-range { font-size: 12px; color: var(--mut); }
+.joint-picker-history {
+  font-family: inherit; font-size: 12.5px; color: var(--aksa-blue);
+  background: none; border: 0; cursor: pointer; padding: 2px 4px; white-space: nowrap;
+}
+.joint-picker-history:hover { text-decoration: underline; }
+.joint-picker-versions {
+  display: flex; flex-direction: column; gap: 1px;
+  margin: 2px 0 8px 26px;
+  padding-left: 12px;
+  border-left: 2px solid color-mix(in srgb, var(--team-accent, var(--teal2)) 35%, var(--line));
+}
+.joint-picker-version {
+  display: flex; align-items: center; gap: 9px;
+  padding: 5px 4px; cursor: pointer; font-size: 13px; color: var(--ink);
+}
+.joint-picker-version input { cursor: pointer; }
+.joint-picker-guncel-badge {
+  font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+  color: var(--aksa-green-dark); background: color-mix(in srgb, var(--aksa-green) 18%, transparent);
+}
+.joint-picker-vmeta { font-size: 12px; color: var(--mut); margin-left: auto; }
+
+/* ===== Ortak Sunum: Tümünü Seç toolbar + seçili sunumlar (surukle-birak) ===== */
+.joint-picker-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.joint-picker-clear {
+  font-family: inherit; font-size: 13px; color: var(--mut);
+  background: none; border: 0; cursor: pointer; padding: 4px 2px;
+}
+.joint-picker-clear:hover { color: var(--ink); text-decoration: underline; }
+
+.joint-selected {
+  margin: 14px 0 10px;
+  padding: 12px 14px;
+  border: 1px dashed color-mix(in srgb, var(--aksa-blue) 40%, var(--glass-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--aksa-blue) 5%, var(--glass-bg));
+}
+.joint-selected-title { font-size: 12.5px; font-weight: 600; color: var(--mut); margin-bottom: 8px; }
+.joint-selected-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.joint-selected-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 9px;
+  background: var(--card);
+  cursor: grab;
+  transition: box-shadow 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+.joint-selected-item:hover { border-color: color-mix(in srgb, var(--aksa-blue) 35%, var(--glass-border)); }
+.joint-selected-item.dragging { opacity: 0.45; box-shadow: 0 6px 16px rgba(0,0,0,0.16); }
+.joint-selected-grip { color: var(--mut); font-size: 15px; cursor: grab; flex: none; }
+.joint-selected-order {
+  width: 22px; height: 22px; flex: none; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff;
+  background: var(--aksa-blue); font-variant-numeric: tabular-nums;
+}
+.joint-selected-name { font-weight: 600; font-size: 14px; color: var(--ink); }
+.joint-selected-meta { font-size: 12.5px; color: var(--mut); font-variant-numeric: tabular-nums; }
+.joint-selected-remove {
+  margin-left: auto; flex: none;
+  width: 24px; height: 24px; border-radius: 6px;
+  border: 0; background: none; cursor: pointer;
+  color: var(--mut); font-size: 13px; line-height: 1;
+}
+.joint-selected-remove:hover { background: color-mix(in srgb, var(--aksa-red, #d9534f) 15%, transparent); color: var(--aksa-red, #d9534f); }
+
+/* ===== Sunum silme: onay modali "Kalıcı sil" butonu + kart Sil aksiyonu ===== */
+.btn.danger {
+  background: var(--aksa-red, #d9534f);
+  color: #fff;
+  border: 1px solid var(--aksa-red, #d9534f);
+}
+.btn.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--aksa-red, #d9534f) 85%, #000);
+  border-color: color-mix(in srgb, var(--aksa-red, #d9534f) 85%, #000);
+}
+.btn.presentation-delete-btn {
+  /* Her zaman kirmizi: hover-once soluk griyken arka planla karisip
+     gorunmuyordu (kullanici bildirimi 2026-09-01). Kirmizi ayrica "kalici
+     silme" tehlikesini de isaret eder. */
+  color: var(--aksa-red, #d9534f);
+  border: 1px solid color-mix(in srgb, var(--aksa-red, #d9534f) 35%, transparent);
+}
+.btn.presentation-delete-btn:hover:not(:disabled) {
+  color: #fff;
+  background: var(--aksa-red, #d9534f);
+  border-color: var(--aksa-red, #d9534f);
 }

@@ -7,6 +7,7 @@ import com.aksa.capacityplanner.presentation.api.dto.PresentationDownloadRequest
 import com.aksa.capacityplanner.presentation.api.dto.PresentationSummaryDto;
 import com.aksa.capacityplanner.presentation.api.dto.PresentationUpdateInPlaceRequest;
 import com.aksa.capacityplanner.presentation.api.dto.PresentationUpsertRequest;
+import com.aksa.capacityplanner.presentation.api.dto.PresentationVersionDetailDto;
 import com.aksa.capacityplanner.presentation.api.dto.PresentationVersionDto;
 import com.aksa.capacityplanner.presentation.domain.PresentationDownloadLog;
 import com.aksa.capacityplanner.presentation.domain.PresentationVersion;
@@ -42,7 +43,7 @@ public class PresentationController {
     @PutMapping
     public PresentationDetailDto upsert(@Valid @RequestBody PresentationUpsertRequest request, Authentication authentication) {
         JwtTokenProvider.AccessTokenClaims claims = requireClaims(authentication);
-        SprintPresentation saved = presentationFacade.upsert(request.teamId(), request.sprintNo(), request.dateRange(),
+        SprintPresentation saved = presentationFacade.upsert(request.id(), request.teamId(), request.sprintNo(), request.dateRange(),
                 request.content(), claims.sicil(), claims.teamIds(), claims.role() == Role.ADMIN);
         return toDetailDto(saved);
     }
@@ -78,6 +79,23 @@ public class PresentationController {
     @GetMapping("/{id}/versions")
     public List<PresentationVersionDto> listVersions(@PathVariable Long id) {
         return presentationFacade.listVersions(id).stream().map(this::toVersionDto).toList();
+    }
+
+    /**
+     * Belirli surumun TAM icerigi (content dahil). Ortak Sunum ekraninda
+     * secilen surumle sunum olusturmak icin - okuma herkese acik. Rollback'in
+     * aksine HICBIR SEY DEGISTIRMEZ (yeni surum eklemez, head'e dokunmaz).
+     */
+    @GetMapping("/{id}/versions/{version}")
+    public PresentationVersionDetailDto getVersion(@PathVariable Long id, @PathVariable int version) {
+        var v = presentationFacade.getVersion(id, version);
+        return new PresentationVersionDetailDto(v.getVersion(), v.getContent(), v.getUpdatedBy(), v.getUpdatedAt());
+    }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id, Authentication authentication) {
+        JwtTokenProvider.AccessTokenClaims claims = requireClaims(authentication);
+        presentationFacade.delete(id, claims.teamIds(), claims.role() == Role.ADMIN);
     }
 
     @PostMapping("/{id}/versions/{version}/rollback")

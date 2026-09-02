@@ -25,6 +25,11 @@ public class PresentationPersistenceAdapter implements PresentationRepositoryPor
     }
 
     @Override
+    public void deleteById(Long id) {
+        jpaRepository.deleteById(id);
+    }
+
+    @Override
     public SprintPresentation save(SprintPresentation presentation) {
         SprintPresentationJpaEntity entity = toEntity(presentation);
         // saveAndFlush KULLANILIYOR: save() merge-only oldugu icin @UpdateTimestamp

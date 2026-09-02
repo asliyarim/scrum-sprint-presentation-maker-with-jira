@@ -34,14 +34,31 @@ public class PresentationFacade {
         return presentationUseCase.getByIdReadOnly(id);
     }
 
-    public SprintPresentation upsert(Long teamId, String sprintNo, String dateRange, Map<String, Object> content,
+    public SprintPresentation upsert(Long id, Long teamId, String sprintNo, String dateRange, Map<String, Object> content,
                                       String callerSicil, List<Long> callerTeamIds, boolean callerIsAdmin) {
         requireEditAccess(teamId, callerTeamIds, callerIsAdmin);
-        return presentationUseCase.upsert(teamId, sprintNo, dateRange, content, callerSicil);
+        // id verildiyse (mevcut sunum duzenleniyor) o kaydin GERCEK takimina da
+        // erisim sart - baska takimin sunumu "duzenleniyor" gibi gonderilemesin.
+        if (id != null) {
+            requireEditAccess(presentationUseCase.getById(id).getTeamId(), callerTeamIds, callerIsAdmin);
+        }
+        return presentationUseCase.upsert(id, teamId, sprintNo, dateRange, content, callerSicil);
     }
 
     public List<PresentationVersion> listVersions(Long presentationId) {
         return presentationUseCase.listVersions(presentationId);
+    }
+
+    /** Sunumu KALICI siler - yalnizca o takima yazma yetkisi olan (ya da admin). */
+    public void delete(Long presentationId, List<Long> callerTeamIds, boolean callerIsAdmin) {
+        SprintPresentation presentation = presentationUseCase.getById(presentationId);
+        requireEditAccess(presentation.getTeamId(), callerTeamIds, callerIsAdmin);
+        presentationUseCase.delete(presentationId);
+    }
+
+    /** Belirli surumun icerigi - okuma herkese acik (listVersions ile ayni ilke). */
+    public PresentationVersion getVersion(Long presentationId, int version) {
+        return presentationUseCase.getVersion(presentationId, version);
     }
 
     public SprintPresentation updateInPlace(Long presentationId, String dateRange, Map<String, Object> content,

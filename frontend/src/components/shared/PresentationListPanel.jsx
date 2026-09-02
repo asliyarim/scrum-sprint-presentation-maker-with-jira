@@ -8,8 +8,8 @@ import UnifiedPreviewPane from "./UnifiedPreviewPane";
 import SlideCanvas from "../sprint/SlideCanvas";
 import DashboardSlideCanvas from "../dashboard/DashboardSlideCanvas";
 import VelocityBurndownSlideCanvas from "../sprint/VelocityBurndownSlideCanvas";
-import { IconPresentation, IconHistory, IconEdit, IconCalendar, IconDownload } from "./icons";
-import { fetchPresentations, fetchPresentation, fetchPresentationVersions, rollbackPresentation, recordPresentationDownload } from "../../lib/apiClient";
+import { IconPresentation, IconHistory, IconEdit, IconCalendar, IconDownload, IconTrash } from "./icons";
+import { fetchPresentations, fetchPresentation, fetchPresentationVersions, rollbackPresentation, deletePresentation, recordPresentationDownload } from "../../lib/apiClient";
 import { sortBySprintNo } from "../../lib/sprintNumbers";
 import { sprintDataFromContent } from "../../lib/presentationContent";
 import { buildFullDeck } from "../../lib/fullDeckBuilder";
@@ -54,6 +54,11 @@ export default function PresentationListPanel({ teamId, teamName, canManage, sho
   // getir" sinyali vermek icin kullanilir (bkz. onRolledBack).
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
 
+  // Silme onayi bekleyen sunum ({ id, sprintNo }) ve silme islemi durumu.
+  // Silme GERI ALINAMAZ oldugu icin dogrudan degil, onay modaliyla yapilir.
+  const [deleteFor, setDeleteFor] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
   const reload = (keepSelectedId) => {
     if (!teamId) return;
     setLoading(true);
@@ -67,6 +72,22 @@ export default function PresentationListPanel({ teamId, teamName, canManage, sho
       .then((liste) => setPresentations(sortBySprintNo(liste)))
       .catch((err) => setError(err?.message || "Sunumlar yüklenemedi."))
       .finally(() => setLoading(false));
+  };
+
+  const handleDelete = async () => {
+    if (!deleteFor) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deletePresentation(deleteFor.id);
+      if (selectedId === deleteFor.id) setSelectedId(null);
+      setDeleteFor(null);
+      reload(true);
+    } catch (err) {
+      setError(err?.message || "Sunum silinemedi.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   useEffect(() => reload(false), [teamId]);
@@ -252,10 +273,28 @@ export default function PresentationListPanel({ teamId, teamName, canManage, sho
                   <IconDownload style={{ width: 15, height: 15 }} />
                   PPTX İndir
                 </Button>
+                <Button variant="ghost" className="presentation-delete-btn" onClick={() => setDeleteFor({ id: p.id, sprintNo: p.sprintNo })}>
+                  <IconTrash style={{ width: 15, height: 15 }} />
+                  Sil
+                </Button>
               </div>
             </div>
           ))}
         </div>
+
+        <Modal open={!!deleteFor} onClose={() => (deleting ? null : setDeleteFor(null))}>
+          <h3 style={{ marginTop: 0 }}>Sunumu sil</h3>
+          <p style={{ color: "var(--mut)", lineHeight: 1.6 }}>
+            <b>Sprint {deleteFor?.sprintNo}</b> sunumunu ve <b>tüm sürüm geçmişini</b> kalıcı olarak
+            silmek üzeresiniz. Bu işlem <b>geri alınamaz</b>.
+          </p>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
+            <Button variant="soft" onClick={() => setDeleteFor(null)} disabled={deleting}>Vazgeç</Button>
+            <Button variant="danger" onClick={handleDelete} loading={deleting} loadingLabel="Siliniyor…">
+              Kalıcı olarak sil
+            </Button>
+          </div>
+        </Modal>
 
         <VersionHistoryModal
           open={!!historyFor}

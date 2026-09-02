@@ -1,5 +1,6 @@
 package com.aksa.capacityplanner.presentation.usecase;
 
+import com.aksa.capacityplanner.common.domain.ConflictException;
 import com.aksa.capacityplanner.common.domain.NotFoundException;
 import com.aksa.capacityplanner.presentation.domain.PresentationDownloadLog;
 import com.aksa.capacityplanner.presentation.domain.PresentationVersion;
@@ -36,6 +37,12 @@ public class PresentationService implements PresentationUseCase {
     }
 
     @Override
+    public void delete(Long id) {
+        getById(id); // yoksa 404
+        presentationRepository.deleteById(id);
+    }
+
+    @Override
     public SprintPresentation getById(Long id) {
         return presentationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Sunum bulunamadi: id=" + id));
@@ -54,15 +61,34 @@ public class PresentationService implements PresentationUseCase {
 
     @Override
     @Transactional
-    public SprintPresentation upsert(Long teamId, String sprintNo, String dateRange, Map<String, Object> content, String updatedBySicil) {
-        SprintPresentation presentation = presentationRepository.findByTeamIdAndSprintNo(teamId, sprintNo)
-                .orElseGet(() -> {
-                    SprintPresentation created = new SprintPresentation();
-                    created.setTeamId(teamId);
-                    created.setSprintNo(sprintNo);
-                    created.setCurrentVersion(0);
-                    return created;
-                });
+    public SprintPresentation upsert(Long id, Long teamId, String sprintNo, String dateRange, Map<String, Object> content, String updatedBySicil) {
+        SprintPresentation presentation;
+        if (id != null) {
+            // Mevcut sunum DUZENLENIYOR. Sprint no degistiyse bu bir RENAME'dir -
+            // yeni kart olusturulmaz, ayni kaydin sprint_no'su guncellenir. Ama
+            // hedef sprint no bu takimda BASKA bir kayitta zaten varsa uzerine
+            // yazmak veri kaybi olur; onun yerine 409 firlatilir (kullanici karari
+            // 2026-09-01: "Sprint X zaten var" uyari, kaydetme).
+            presentation = getById(id);
+            if (!presentation.getSprintNo().equals(sprintNo)) {
+                presentationRepository.findByTeamIdAndSprintNo(presentation.getTeamId(), sprintNo)
+                        .filter(other -> !other.getId().equals(presentation.getId()))
+                        .ifPresent(other -> {
+                            throw new ConflictException("Sprint " + sprintNo + " zaten var. Farkli bir sprint numarasi girin ya da o sunumu duzenleyin.");
+                        });
+                presentation.setSprintNo(sprintNo);
+            }
+        } else {
+            // Yeni sunum ya da ayni (teamId, sprintNo) uzerine yeni surum - eski davranis.
+            presentation = presentationRepository.findByTeamIdAndSprintNo(teamId, sprintNo)
+                    .orElseGet(() -> {
+                        SprintPresentation created = new SprintPresentation();
+                        created.setTeamId(teamId);
+                        created.setSprintNo(sprintNo);
+                        created.setCurrentVersion(0);
+                        return created;
+                    });
+        }
         // Bir sonraki surum numarasi currentVersion+1 DEGIL, versions tablosundaki
         // GERCEK en yuksek numaradan hesaplanir - rollback() artik currentVersion'i
         // GERIYE (ornegin v3'ten v2'ye) dusurebildigi icin, "checkout edilmis" bir
@@ -106,6 +132,14 @@ public class PresentationService implements PresentationUseCase {
     public List<PresentationVersion> listVersions(Long presentationId) {
         getById(presentationId);
         return versionRepository.findByPresentationId(presentationId);
+    }
+
+    @Override
+    public PresentationVersion getVersion(Long presentationId, int version) {
+        getById(presentationId); // sunum var mi dogrula (yoksa 404)
+        return versionRepository.findByPresentationIdAndVersion(presentationId, version)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Sunum " + presentationId + " icin " + version + ". surum bulunamadi."));
     }
 
     /**

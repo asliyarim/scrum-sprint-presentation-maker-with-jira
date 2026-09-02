@@ -935,6 +935,11 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
     setSaveStatus({ loading: true, error: null });
     try {
       const saved = await savePresentation({
+        // Mevcut bir sunum duzenleniyorsa onun id sini gonder - sprint no
+        // degistirilip kaydedilince yeni kart cikip "cokluyordu"; artik ayni
+        // kayit RENAME edilir (kullanici bildirimi 2026-09-01). Yeni sunumda
+        // aktifSunum null, id gitmez, eski davranis.
+        id: aktifSunum?.id ?? null,
         teamId: saveTeamId, sprintNo: sprintForm.sprint, dateRange: sprintForm.range, content: buildSaveContent(),
       });
       setPresentationMeta({ id: saved.id, teamId: saved.teamId, sprintNo: saved.sprintNo, currentVersion: saved.currentVersion });
