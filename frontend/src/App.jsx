@@ -681,9 +681,14 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
     // cip'lerini ekleyene kadar hicbir sey degismemis GİBİ gorunuyordu (bkz.
     // kullanici bildirimi 2026-08-20: "içerik slaytında hala excel verisi
     // kalıyor jiradan çekmeliydi").
-    if (SECTION_KEYS.some((k) => sprintForm.sections[k]?.trim())) {
-      SECTION_KEYS.forEach((k) => sprintForm.setSectionText(k, ""));
-    }
+    // NOT: Eskiden burada icerik slayty maddeleri (sections) TEMIZLENIYORDU
+    // (kullanici bildirimi 2026-08-20: yeni kaynak yuklenince eski metin
+    // kalmasin). Ama bu, PO nun İçerik Slaytina ELLE yazdigi maddeleri de
+    // siliyordu: Ece Hanim 4 karti doldurup Kapasite Dashboardda Excel
+    // yukleyince/Jira cekince butun icerik ucup gidiyordu (kullanici bildirimi
+    // 2026-09-02). Icerik slayty ile kapasite kaynagi (Excel/Jira/Manuel)
+    // BAGIMSIZ verilerdir - kapasite kaynagi degisince icerik maddeleri artik
+    // KORUNUR; PO isterse maddeleri elle temizler.
     setJiraSyncing(true);
     setJiraSyncNotice(null);
     // jiraProjectKey burada gonderilmiyor - backend, takima kayitli varsayilani
@@ -1044,9 +1049,14 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
     // Daha once elle girilmis olabilecek veri (icerik bolumleri + kapasite
     // manuel giris) yeni yuklenen Excel'in verisiyle CELISMESIN/karisik
     // gorunmesin diye temizlenir - bkz. kullanici bildirimi.
-    if (SECTION_KEYS.some((k) => sprintForm.sections[k]?.trim())) {
-      SECTION_KEYS.forEach((k) => sprintForm.setSectionText(k, ""));
-    }
+    // NOT: Eskiden burada icerik slayty maddeleri (sections) TEMIZLENIYORDU
+    // (kullanici bildirimi 2026-08-20: yeni kaynak yuklenince eski metin
+    // kalmasin). Ama bu, PO nun İçerik Slaytina ELLE yazdigi maddeleri de
+    // siliyordu: Ece Hanim 4 karti doldurup Kapasite Dashboardda Excel
+    // yukleyince/Jira cekince butun icerik ucup gidiyordu (kullanici bildirimi
+    // 2026-09-02). Icerik slayty ile kapasite kaynagi (Excel/Jira/Manuel)
+    // BAGIMSIZ verilerdir - kapasite kaynagi degisince icerik maddeleri artik
+    // KORUNUR; PO isterse maddeleri elle temizler.
     if (manual.members.length || manual.workItems.length) {
       manual.clearEntries();
     }
