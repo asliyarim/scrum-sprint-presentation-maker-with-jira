@@ -84,6 +84,9 @@ services:
       JIRA_BASE_URL: ${JIRA_BASE_URL:-}
       JIRA_ACCOUNT_EMAIL: ${JIRA_ACCOUNT_EMAIL:-}
       JIRA_API_KEY: ${JIRA_API_KEY:-}
+      # Dis projelerin /api/integration/** ucunu cagirirken kullandigi servis
+      # anahtari. Bos ise entegrasyon uclari kapalidir (bkz. ApiKeyAuthFilter).
+      INTEGRATION_API_KEY: ${INTEGRATION_API_KEY:-}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:

@@ -48,6 +48,12 @@ app:
       secret-key: ${MINIO_ROOT_PASSWORD:capacity_planner}
       bucket: ${MINIO_BUCKET:capacity-planner-assets}
 
+# Dis projelerin kapasite verisini cektigi servis anahtari (bkz.
+# integration/security/ApiKeyAuthFilter). Bos birakilirsa entegrasyon uclari
+# tamamen kapalidir - anahtar SADECE ortam degiskeninden verilir.
+integration:
+  api-key: ${INTEGRATION_API_KEY:}
+
 jira:
   enabled: ${JIRA_ENABLED:false}
   base-url: ${JIRA_BASE_URL:}
