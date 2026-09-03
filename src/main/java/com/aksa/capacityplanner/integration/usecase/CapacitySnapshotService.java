@@ -91,7 +91,7 @@ public class CapacitySnapshotService {
                 maintainedTotal,
                 percent(kpis.get("doluluk")),
                 scaled(kpis.get("acikFazla")),
-                text(kpis.get("durum")));
+                status(kpis.get("durum"), kpis.get("doluluk")));
 
         return new TeamCapacitySnapshotDto(team.getId(), team.getName(), presentation.getSprintNo(),
                 presentation.getDateRange(), text(dashData.get("reportDate")), presentation.getUpdatedAt(),
@@ -111,7 +111,7 @@ public class CapacitySnapshotService {
                 person.get("bakimliKapasite") != null ? scaled(person.get("bakimliKapasite"))
                         : scaled(person.get("kapasite")),
                 percent(person.get("doluluk")),
-                text(person.get("durum")));
+                status(person.get("durum"), person.get("doluluk")));
     }
 
     // --- serbest bicimli JSON'dan guvenli okuma yardimcilari ---
@@ -155,6 +155,37 @@ public class CapacitySnapshotService {
     private BigDecimal scaled(Object value) {
         BigDecimal number = raw(value);
         return number == null ? null : number.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Durum etiketi, frontend'deki dStatus (lib/format.js) ile BIREBIR AYNI
+     * turetilir: doluluk bir SAYIYSA kayitli "durum" alani YOK SAYILIR ve etiket
+     * esiklerden hesaplanir; yalnizca doluluk yoksa kayitli durum kullanilir.
+     *
+     * Bu sart, cunku canli onizleme (DashboardSlideCanvas) ve PPTX ciktisi
+     * (dashboardDeckBuilder) de ayni fonksiyonu kullanir - yani PO'nun EKRANDA
+     * GORDUGU etiket budur. Kayitli ham "durum" bayatlayabiliyor: CBS Sprint
+     * 11'de kayitta "Yüksek Risk" yaziyordu ama doluluk 0.63 oldugu icin ekranda
+     * "Uygun" gorunuyordu (kullanici tespiti 2026-09-03). Ham alani aktarmak,
+     * servisin PO'nun gordugunden FARKLI veri vermesine yol aciyordu.
+     *
+     * Esikler (oran uzerinden): >=1.2 Yüksek Risk, >=1.0 Risk, >=0.85 Dikkat.
+     */
+    private String status(Object durum, Object doluluk) {
+        BigDecimal ratio = raw(doluluk);
+        if (ratio == null) {
+            return text(durum);
+        }
+        if (ratio.compareTo(new BigDecimal("1.2")) >= 0) {
+            return "Yüksek Risk";
+        }
+        if (ratio.compareTo(BigDecimal.ONE) >= 0) {
+            return "Risk";
+        }
+        if (ratio.compareTo(new BigDecimal("0.85")) >= 0) {
+            return "Dikkat";
+        }
+        return "Uygun";
     }
 
     /** Kayittaki doluluk ORAN'dir (1.59); disariya YUZDE (159.00) olarak verilir. */
