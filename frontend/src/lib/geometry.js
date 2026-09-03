@@ -24,6 +24,20 @@ export const GROW_MAX = 16;
 export const GROW_CANDIDATES = [16, 15.5, 15, 14.5, 14, 13.5, 13, FS_BASE];
 export const GROW_ITEM_THRESHOLD = 5;
 
+// Az maddeli (GROW_ITEM_THRESHOLD altinda) bir kartin merdiveni: ONCE
+// GROW_CANDIDATES (kart bos/dagitik gorunmesin diye FS_BASE ustune cikabilir),
+// SONRA normal kucultme rungslari (FS_BASE'in ALTI, FS_MIN'e kadar). FS_BASE
+// (12.5) iki listede de oldugu icin FS_CANDIDATES'in ilk elemani atlanir.
+//
+// Kritik: eskiden az maddeli kart SADECE GROW_CANDIDATES kullaniyordu, yani
+// tabani 12.5pt idi. 4 uzun maddesi olan bir kart 12.5pt'de sigmayinca daha
+// kucuk font DENENEMEDIGI icin madde KIRPILIP "+N madde" yaziliyordu (kullanici
+// bildirimi 2026-09-03, Ece/İş Zekası: "Yapılacak İşler kartında 2 madde
+// gorunup +2 madde yaziyor, oysa sutunda 14'un cok altinda madde var"). Artik
+// once buyur, SIGMAZSA 4pt'ye kadar kucul - kirpma yalnizca gercekten (en kucuk
+// fontta bile) sigmayan durumda son care olarak yapilir.
+export const GROW_THEN_SHRINK = [...GROW_CANDIDATES, ...FS_CANDIDATES.slice(1)];
+
 // Bir SUTUNDA (ust + alt kart birlikte) gosterilecek EN FAZLA madde sayisi.
 // Sol sutun = Tamamlanan Isler + Riskler, sag sutun = Yapilacak Isler +
 // Bekleyen Konular. Bu sinir olmadan tek olcut geometriydi: yazi FS_MIN'e
@@ -236,7 +250,7 @@ export function cardH(items, f) {
  * FS_CANDIDATES (FS_BASE'ten FS_MIN'e kucule kucule) denenir.
  */
 function ladderFor(items) {
-  return items.length > 0 && items.length < GROW_ITEM_THRESHOLD ? GROW_CANDIDATES : FS_CANDIDATES;
+  return items.length > 0 && items.length < GROW_ITEM_THRESHOLD ? GROW_THEN_SHRINK : FS_CANDIDATES;
 }
 
 export function pickCardFS(items, availH) {
