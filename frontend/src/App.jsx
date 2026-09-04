@@ -405,16 +405,15 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [excel.bandTargets]);
 
-  // Jira'dan Getir de AYNI bandi (HEDEFLER: Canlı/Kalan Süreç Sayısı)
-  // doldurabilir - bkz. jiraContentMapper.js buildBandTargetsFromWorkItems.
-  // "FTE" cubugu Jira'dan TURETILEMEZ (kullanici bildirimi, 2026-08-17: "hedefler
-  // bandını da jira dan otomatik çekebilir miyiz" - arastirildi, Jira'da FTE
-  // alani yok, sadece süreç sayısı cubugu doldurulabilir).
-  useEffect(() => {
-    if (jiraContent.bandTargets.length) band.setSample(jiraContent.bandTargets);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jiraContent.bandTargets]);
-
+  // NOT: "Jira'dan Getir" Hedefler bandina ARTIK DOKUNMAZ.
+  //
+  // Eskiden bu akis da bandi doldururdu (buildBandTargetsFromWorkItems) ve
+  // PO'nun AYNI slaytta elle girdigi cubuklari sessizce EZIYORDU: Is Zekasi ve
+  // RPA hedef cubuklarini manuel giriyor, sonra alttaki 4 karti doldurmak icin
+  // "Jira'dan Getir"e basinca ustteki manuel veri kayboluyordu (kullanici
+  // bildirimi 2026-09-04: "istenmeyen bir veri kaybi"). Hedefler bandi artik
+  // HER takim icin yalnizca manuel/Excel kaynaklidir; "Jira'dan Getir" sadece
+  // alttaki 4 icerik kartini besler.
   // ---- Kapasite Dashboard (3. adim) durumu ----
   const [dashSource, setDashSource] = useState("excel");
   // Takimin kayitli bakim/SR orani (teams.maintenance_allocation_percent,

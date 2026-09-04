@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { fetchWorkItems } from "../lib/apiClient";
-import { bucketWorkItemsForContent, buildBandTargetsFromWorkItems } from "../lib/jiraContentMapper";
+import { bucketWorkItemsForContent } from "../lib/jiraContentMapper";
 
 /**
  * İçerik Slaytı'nin "Jira'dan Getir" akisi - useExcelSuggestions ile AYNI
@@ -14,16 +14,15 @@ import { bucketWorkItemsForContent, buildBandTargetsFromWorkItems } from "../lib
  * sonra burada "Jira'dan Getir".
  *
  * Getirilen icerik PO notu 2026-08-19 ile degisti: artik tek tek gorev/story
- * degil, AKTIF SPRINT'teki gorev/story'lerin TEKILLESTIRILMIS UST OGESI (Epic)
- * doner ve SADECE done/active kutulari dolar - Riskler/Bekleyen Konular
- * Jira'dan getirilmez, PO'lar elle yazar (bkz. jiraContentMapper.js).
+ * degil, gorev/story'lerin TEKILLESTIRILMIS UST OGESI (Epic) doner ve SADECE
+ * done/active kutulari dolar - Riskler/Bekleyen Konular Jira'dan getirilmez,
+ * PO'lar elle yazar (bkz. jiraContentMapper.js).
+ *
+ * Hedefler bandina DOKUNULMAZ: bu akis yalnizca alttaki 4 icerik kartini
+ * besler (kullanici bildirimi 2026-09-04 - manuel girilen cubuklar eziliyordu).
  */
 export function useJiraContentSuggestions() {
   const [suggestions, setSuggestions] = useState({ done: [], active: [], risk: [], pending: [] });
-  // "HEDEFLER" cubugu (Canlı/Kalan Süreç Sayısı) - bkz. jiraContentMapper.js
-  // buildBandTargetsFromWorkItems. "FTE" cubugu BILEREK yok - Jira'da bu
-  // veriyi tutan bir alan olmadigi icin turetilemez.
-  const [bandTargets, setBandTargets] = useState([]);
   const [info, setInfo] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -39,13 +38,12 @@ export function useJiraContentSuggestions() {
       const items = await fetchWorkItems(teamId);
       const { suggestions: bucketed, stats } = bucketWorkItemsForContent(items, jiraProjectKey);
       setSuggestions(bucketed);
-      setBandTargets(buildBandTargetsFromWorkItems(items));
       const total = bucketed.done.length + bucketed.active.length;
       setInfo(
         total > 0
-          ? `Tamamlanan: önceki sprintin ${stats.previousSprintItemCount} canlı işinden ${bucketed.done.length} tanesi listelendi. `
+          ? `Tamamlanan: önceki sprintin ${stats.previousSprintItemCount} canlı işinden ${bucketed.done.length} üst öğe (Epic). `
             + `Yapılacak: aktif sprintin ${stats.activeSprintItemCount} işinden ${bucketed.active.length} üst öğe (Epic).`
-            + (stats.withoutParent > 0 ? ` (Yapılacak) ${stats.withoutParent} kayıt üst öğesi olmadığı için listelenmedi.` : "")
+            + (stats.withoutParent > 0 ? ` ${stats.withoutParent} kayıt üst öğesi olmadığı için listelenmedi.` : "")
             + (stats.excludedOwnTeamLabel > 0 ? ` ${stats.excludedOwnTeamLabel} kayıt takımın kendi etiketini taşıyan (idari/toplantı) bir üst öğeye bağlı olduğu için listelenmedi.` : "")
             + " Riskler ve Bekleyen Konular Jira'dan getirilmez — bu iki bölümü elle yazın."
           : "Jira'dan hiç eşleşen madde bulunamadı - önce üst çubuktaki \"Jira'dan Çek\" ile senkronize edildiğinden, iş kalemlerinin bir sprinte ve bir üst öğeye (Epic) bağlı olduğundan emin ol."
@@ -63,8 +61,7 @@ export function useJiraContentSuggestions() {
 
   const clear = () => {
     setSuggestions({ done: [], active: [], risk: [], pending: [] });
-    setBandTargets([]);
   };
 
-  return { suggestions, bandTargets, info, error, loading, fetchFromJira, removeSuggestion, clear };
+  return { suggestions, info, error, loading, fetchFromJira, removeSuggestion, clear };
 }

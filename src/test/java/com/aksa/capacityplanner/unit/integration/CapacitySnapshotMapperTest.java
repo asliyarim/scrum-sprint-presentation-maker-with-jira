@@ -54,6 +54,7 @@ class CapacitySnapshotMapperTest {
         assertThat(m.fullName()).isEqualTo("Müge"); // roster yok -> name
         assertThat(m.capacity()).isEqualByComparingTo("94.00");
         assertThat(m.maintainedCapacity()).isEqualByComparingTo("75.20");
+        assertThat(m.maintenancePercent()).isEqualByComparingTo("20.00"); // kayitta 0.2 -> %20
         assertThat(m.occupancyPercent()).isEqualByComparingTo("108.84");
         assertThat(m.status()).isEqualTo("Risk");
     }
@@ -189,6 +190,7 @@ class CapacitySnapshotMapperTest {
         m.put("acik", acik);
         m.put("kapasite", kapasite);
         m.put("bakimliKapasite", bakimli);
+        m.put("bakimOrani", 0.2);
         m.put("doluluk", doluluk);
         m.put("durum", durum);
         return m;

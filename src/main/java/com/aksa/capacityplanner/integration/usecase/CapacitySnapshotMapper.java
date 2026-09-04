@@ -9,6 +9,7 @@ import com.aksa.capacityplanner.team.domain.TeamMember;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -16,6 +17,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -137,6 +140,7 @@ public final class CapacitySnapshotMapper {
                 scaled(person.get("kapasite")),
                 person.get("bakimliKapasite") != null ? scaled(person.get("bakimliKapasite"))
                         : scaled(person.get("kapasite")),
+                maintenancePercent(person),
                 percent(person.get("doluluk")),
                 status(person.get("durum"), person.get("doluluk")));
     }
@@ -306,9 +310,93 @@ public final class CapacitySnapshotMapper {
         return n == null ? null : n.setScale(2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * Takim kaydinda oran yoksa kullanilan varsayilan bakim/SR orani -
+     * frontend'deki VARSAYILAN_BAKIM_ORANI (lib/format.js) ile AYNI.
+     */
+    private static final BigDecimal VARSAYILAN_BAKIM_ORANI = new BigDecimal("0.20");
+    private static final BigDecimal TURETME_ALT_SINIR = new BigDecimal("0.001");
+    private static final BigDecimal TURETME_UST_SINIR = new BigDecimal("0.9");
+
+    /**
+     * Kisi satirinin bakim/SR orani, YUZDE olarak (0.20 -> 20.00).
+     *
+     * Frontend'deki bakimOraniOf (lib/format.js) ile BIREBIR AYNI sirayla
+     * turetilir, cunku ekrandaki "(bakım %20)" notu o fonksiyonun sonucudur -
+     * kayitta alan olmasa bile ekran bir deger gosterir, servis de ayni degeri
+     * vermelidir (kullanici karari 2026-09-04: "ekranda gordugumuz veriler
+     * oldugu gibi"):
+     *   1) kayitta bakimOrani varsa dogrudan o,
+     *   2) bakimliKapasite < kapasite ise 1 - bakimli/kapasite,
+     *   3) doluluk ve kapasiteden turetilebiliyorsa 1 - acik/(doluluk*kapasite)
+     *      (yalnizca 0.001-0.9 araligindaysa; disi guvenilmez sayilir),
+     *   4) hicbiri yoksa varsayilan 0.20.
+     */
+    static BigDecimal maintenancePercent(Map<String, Object> person) {
+        return toPercent(maintenanceRatio(person));
+    }
+
+    private static BigDecimal maintenanceRatio(Map<String, Object> person) {
+        BigDecimal acik = raw(person.get("bakimOrani"));
+        if (acik != null) {
+            return acik;
+        }
+        BigDecimal kapasite = raw(person.get("kapasite"));
+        BigDecimal bakimli = raw(person.get("bakimliKapasite"));
+        if (bakimli != null && kapasite != null && kapasite.signum() > 0 && bakimli.compareTo(kapasite) < 0) {
+            return BigDecimal.ONE.subtract(bakimli.divide(kapasite, 6, RoundingMode.HALF_UP));
+        }
+        BigDecimal doluluk = raw(person.get("doluluk"));
+        BigDecimal acikEfor = raw(person.get("acik"));
+        if (doluluk != null && acikEfor != null && kapasite != null
+                && doluluk.signum() > 0 && kapasite.signum() > 0) {
+            BigDecimal payda = doluluk.multiply(kapasite);
+            if (payda.signum() > 0) {
+                BigDecimal turetilen = BigDecimal.ONE.subtract(acikEfor.divide(payda, 6, RoundingMode.HALF_UP));
+                if (turetilen.compareTo(TURETME_ALT_SINIR) > 0 && turetilen.compareTo(TURETME_UST_SINIR) < 0) {
+                    return turetilen;
+                }
+            }
+        }
+        return VARSAYILAN_BAKIM_ORANI;
+    }
+
+    private static BigDecimal toPercent(BigDecimal ratio) {
+        return ratio == null ? null : ratio.multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP);
+    }
+
     /** Kayittaki doluluk ORAN'dir (1.59); disariya YUZDE (159.00). */
     static BigDecimal percent(Object value) {
         BigDecimal n = raw(value);
         return n == null ? null : n.multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /** "10.08.2026" / "7.9.2026" gibi TR tarihlerini yakalar. */
+    private static final Pattern REPORT_DATE = Pattern.compile("(\\d{1,2})[.\\-/](\\d{1,2})[.\\-/](\\d{4})");
+
+    /**
+     * Sunumun dashData.reportDate degerini tarihe cevirir ("10.08.2026" ->
+     * 2026-08-10). Alan yoksa, bos ise ("–" gibi) ya da bicim taninmiyorsa null
+     * doner; cagiran taraf bunu "rapor tarihi bilinmiyor" olarak ele alir
+     * (bkz. CapacitySnapshotService.raporTarihiGelmis).
+     */
+    public static LocalDate reportDateOf(SprintPresentation presentation) {
+        if (presentation == null) {
+            return null;
+        }
+        String raw = text(asMap(valueOf(presentation.getContent(), DASH_DATA)).get("reportDate"));
+        if (raw == null) {
+            return null;
+        }
+        Matcher m = REPORT_DATE.matcher(raw);
+        if (!m.find()) {
+            return null;
+        }
+        try {
+            return LocalDate.of(Integer.parseInt(m.group(3)), Integer.parseInt(m.group(2)),
+                    Integer.parseInt(m.group(1)));
+        } catch (RuntimeException ignored) {
+            return null; // 32.13.2026 gibi gecersiz tarih
+        }
     }
 }

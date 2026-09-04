@@ -158,29 +158,6 @@ function toSuggestion(epic) {
 }
 
 /**
- * Tek bir HAM is kalemini (Epic'e tekillestirilmeden) oneriye cevirir.
- *
- * Kullanici teyidi 2026-08-20: "tamamlanan işlerde 21 canlı iş 10 u üst öge
- * diyor ... artık bu 21 canlı işin hepsini getirecek" - Epic bazinda gruplama
- * (bkz. toSuggestion/groupByParent, PO notu 2026-08-19) bir onceki sprintte
- * tamamlanmis is sayisini gizliyordu: hem coklu isi TEK Epic satirina
- * indiriyordu hem de bir Epic'in mevcut sprintte HALA acik isi varsa o
- * Epic'in gecmis sprintte biten butun isleri de sessizce dusuyordu (orn.
- * Yapay Zeka ekibinde "PRJ205" epic'i altinda onceki sprintte biten 7 is,
- * epic'in mevcut sprintte devam eden isleri oldugu icin HIC gorunmuyordu).
- * Artik "Tamamlanan İşler" dogrudan HAM is kalemi listesidir.
- */
-function toItemSuggestion(item) {
-  const priority = translateJiraPriority(item.priority);
-  return makeSuggestion(formatWorkItemName(item.title, item.sector, null, priority), {
-    priority,
-    sector: item.sector,
-    addedDate: item.addedDate || null,
-    source: "jira",
-  });
-}
-
-/**
  * previousSprintItems (bir onceki sprintin CANLI is kalemleri) icinden
  * GERCEK tekrarlari eler - ayni Jira kaydi iki kez gelmisse (orn. senkron
  * hatasi) jiraIssueKey ile, o da yoksa baslik+ust oge ile tekillestirilir.
@@ -238,9 +215,8 @@ export function bucketWorkItemsForContent(workItems, jiraProjectKey) {
   );
   const activeSprintItems = taskLevel.filter((item) => item.activeSprint);
 
-  // Yapılacak İşler AYNEN kaliyor: aktif sprintteki gorev/story'lerin
-  // tekillestirilmis ust ogesi (Epic) - bu davranis degismedi, sadece
-  // Tamamlanan degisti (bkz. yukaridaki toItemSuggestion notu).
+  // Yapılacak İşler: aktif sprintteki gorev/story'lerin tekillestirilmis ust
+  // ogesi (Epic).
   const current = groupByParent(activeSprintItems);
 
   const suggestions = { done: [], active: [], risk: [], pending: [] };
@@ -252,18 +228,30 @@ export function bucketWorkItemsForContent(workItems, jiraProjectKey) {
     suggestions.active.push(toSuggestion(epic));
   });
 
-  // Tamamlanan İşler: bir onceki sprintin HER canli is kalemi, tek tek
-  // (bkz. toItemSuggestion). Epic'in mevcut sprintte hala acik isi olup
-  // olmamasi ARTIK ONEMSIZ - eskiden butun Epic'i gizliyordu. Epic'i takimin
-  // KENDI adiyla etiketlenmis (idari/toplanti isi) is kalemleri elenir -
-  // bkz. epicLabeledWithOwnTeam.
+  // Tamamlanan İşler: bir onceki sprintin canli islerinin UST OGESI (Epic) -
+  // Yapılacak ile AYNI seviye.
+  //
+  // Bu kural 2026-09-04'te GERI ALINDI: 2026-08-20'de "21 canlı işin hepsini
+  // getirecek" denip ham is kalemine dusulmustu, ancak kullanici 2026-09-04'te
+  // "tamamlanan işler kısmında parentler gelmiyor ... bir önceki sprintin
+  // ticketlarinin parentlari, epicleri gelmeli" diyerek Epic seviyesine
+  // donulmesini istedi. Ikisi ayni anda saglanamaz: Epic'e tekillestirmek
+  // madde sayisini dusurur (ayni Epic altindaki 5 is tek satir olur) - bu
+  // BILEREK kabul edilen davranistir.
+  //
+  // Epic'i takimin KENDI adiyla etiketlenmis (idari/toplanti isi) kayitlar,
+  // gruplamadan ONCE elenir - bkz. epicLabeledWithOwnTeam.
   let excludedOwnTeamLabel = 0;
-  dedupeItems(previousSprintItems).forEach((item) => {
+  const doneItems = dedupeItems(previousSprintItems).filter((item) => {
     if (epicLabeledWithOwnTeam(item, jiraProjectKey)) {
       excludedOwnTeamLabel++;
-      return;
+      return false;
     }
-    suggestions.done.push(toItemSuggestion(item));
+    return true;
+  });
+  const previous = groupByParent(doneItems);
+  previous.byParent.forEach((epic) => {
+    suggestions.done.push(toSuggestion(epic));
   });
 
   return {
@@ -272,44 +260,17 @@ export function bucketWorkItemsForContent(workItems, jiraProjectKey) {
       previousSprintItemCount: previousSprintItems.length,
       activeSprintItemCount: activeSprintItems.length,
       epicCount: suggestions.active.length,
-      withoutParent: current.withoutParent,
+      // Ust ogesi olmadigi icin listelenemeyen kayitlar - iki kutunun toplami.
+      withoutParent: current.withoutParent + previous.withoutParent,
       excludedOwnTeamLabel,
     },
   };
 }
 
-/**
- * Hedefler bandinin "HEDEFLER" cubugunu (Canlı Süreç Sayısı yeşil / Kalan
- * Süreç Sayısı mavi) work_items'tan hesaplar - bkz. excelParsers.js
- * parseBandTargets'in Excel karsiligi. SADECE bu cubuk Jira'dan turetilebilir:
- * "FTE" cubugu TURETILEMEZ, cunku Jira'da FTE'yi tutan HICBIR alan yok
- * (bkz. /api/jira-discovery/fields taramasi, 2026-08-17).
- *
- * SADECE guncel aktif sprintteki is kalemleri sayilir (item.activeSprint).
- * Takimin board id'si tanimli degilse veya sync henuz sprint bilgisini
- * tasimiyorsa hicbir item activeSprint=true olmaz - bu durumda hedefi tamamen
- * bos gostermek yerine eski (tum backlog) davranisina GERI DUSULUR.
- */
-export function buildBandTargetsFromWorkItems(workItems) {
-  const items = workItems || [];
-  const sprintScoped = items.filter((item) => item.activeSprint);
-  const source = sprintScoped.length > 0 ? sprintScoped : items;
-
-  let canli = 0;
-  let kalan = 0;
-  source.forEach((item) => {
-    if (!(item.title || "").trim()) return;
-    if (DONE_STATUS_CODES.has(item.statusCode)) canli++;
-    else kalan++;
-  });
-  if (canli + kalan === 0) return [];
-  return [
-    {
-      label: "HEDEFLER",
-      segments: [
-        { value: String(canli), color: "green" },
-        { value: String(kalan), color: "blue" },
-      ],
-    },
-  ];
-}
+// NOT: buildBandTargetsFromWorkItems KALDIRILDI (2026-09-04).
+//
+// Hedefler bandini Jira'dan turetip otomatik yazan fonksiyondu; PO'nun AYNI
+// slaytta elle girdigi cubuklari eziyordu (Is Zekasi ve RPA bandi manuel
+// giriyor, "Jira'dan Getir"e basinca ustteki veri kayboluyordu - kullanici
+// bildirimi 2026-09-04). Hedefler bandi artik yalnizca manuel/Excel
+// kaynaklidir; bu dosya SADECE alttaki 4 icerik kartini besler.
