@@ -110,9 +110,9 @@ public final class CapacitySnapshotMapper {
                 scaled(kpis.get("acikFazla")),
                 status(kpis.get("durum"), kpis.get("doluluk")),
                 fteOf(asList(valueOf(dashData, CUSTOM_KPIS))),
-                scaled(delta.get("kapanan")),
-                scaled(delta.get("eklenen")),
-                scaled(delta.get("net")));
+                reportedClosed(delta),
+                reportedAdded(delta),
+                reportedNetChange(delta));
 
         return new TeamCapacitySnapshotDto(API_VERSION, team.getId(), team.getName(), projectKey, UNIT,
                 latest.getSprintNo(), latest.getDateRange(), text(dashData.get("dateRange")),
@@ -363,6 +363,41 @@ public final class CapacitySnapshotMapper {
 
     private static BigDecimal toPercent(BigDecimal ratio) {
         return ratio == null ? null : ratio.multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * "Dönem Kapanan / Yeni Eklenen / Net İş Yükü Değişimi" kartlari - ekrandaki
+     * buildSummaryCards (lib/format.js) ile AYNI kural:
+     *
+     *  - delta blogu HIC YOKSA uc alan da null doner. Ekran da o kartlari HIC
+     *    cizmez (orn. CBS Sprint 11'de bu kartlar yok) - "veri yok" demektir.
+     *  - delta blogu VARSA ekran her zaman bir sayi gosterir: bos alan 0 sayilir.
+     *  - net BOS ise ekran onu "kapanan - eklenen" olarak TURETIR (orn. Is
+     *    Zekasi Sprint 4: 32 - 26 = 6). Eskiden servis burada null donuyordu,
+     *    yani ekranda deger varken API bos veriyordu (kullanici tespiti
+     *    2026-09-04, Postman karsilastirmasi).
+     */
+    private static BigDecimal reportedClosed(Map<String, Object> delta) {
+        return delta.isEmpty() ? null : scaledOrZero(delta.get("kapanan"));
+    }
+
+    private static BigDecimal reportedAdded(Map<String, Object> delta) {
+        return delta.isEmpty() ? null : scaledOrZero(delta.get("eklenen"));
+    }
+
+    private static BigDecimal reportedNetChange(Map<String, Object> delta) {
+        if (delta.isEmpty()) {
+            return null;
+        }
+        BigDecimal kayitli = raw(delta.get("net"));
+        return kayitli != null ? kayitli.setScale(2, RoundingMode.HALF_UP)
+                : scaledOrZero(delta.get("kapanan")).subtract(scaledOrZero(delta.get("eklenen")));
+    }
+
+    /** Delta kartlarinda bos alan EKRANDA 0 gorunur (num("") === 0). */
+    private static BigDecimal scaledOrZero(Object value) {
+        BigDecimal n = raw(value);
+        return (n == null ? BigDecimal.ZERO : n).setScale(2, RoundingMode.HALF_UP);
     }
 
     /** Kayittaki doluluk ORAN'dir (1.59); disariya YUZDE (159.00). */
