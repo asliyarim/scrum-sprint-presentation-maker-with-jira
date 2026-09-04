@@ -40,10 +40,15 @@ export default function AdminHomePage({ personnel, theme, onToggleTheme }) {
         onToggleTheme={onToggleTheme}
         personnel={personnel}
         actions={
-          <Button variant="ghost" onClick={() => navigate("/admin/monitoring")}>
-            <IconActivity className="navbar-icon" />
-            İzleme
-          </Button>
+          <>
+            <Button variant="ghost" onClick={() => navigate("/admin/kazanimlar")}>
+              Kazanımlar
+            </Button>
+            <Button variant="ghost" onClick={() => navigate("/admin/monitoring")}>
+              <IconActivity className="navbar-icon" />
+              İzleme
+            </Button>
+          </>
         }
       />
       <main className="admin-split">

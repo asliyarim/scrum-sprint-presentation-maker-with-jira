@@ -1,7 +1,5 @@
 package com.aksa.capacityplanner.integration.usecase;
 
-import com.aksa.capacityplanner.integration.api.dto.CapacityTotalsDto;
-import com.aksa.capacityplanner.integration.api.dto.MemberCapacitySnapshotDto;
 import com.aksa.capacityplanner.integration.api.dto.TeamCapacitySnapshotDto;
 import com.aksa.capacityplanner.presentation.domain.SprintPresentation;
 import com.aksa.capacityplanner.presentation.facade.PresentationFacade;
@@ -9,34 +7,36 @@ import com.aksa.capacityplanner.team.domain.Team;
 import com.aksa.capacityplanner.team.facade.TeamFacade;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Her takimin EN SON kaydettigi sunumdaki kapasite verisini disariya verilecek
- * sekilde normallestirir.
+ * Her takimin EN SON kaydettigi sunumdaki kapasite verisini toplar; donusum
+ * CapacitySnapshotMapper'dadir (saf, test edilebilir).
  *
  * Neden "son kayit"? Kapasite dashboard'unun ana akisi STATELESS calisir (PO
  * Excel'i yukler, hesap anlik yapilir) - kalici olarak yalnizca sunum
- * kaydedilirken content.dashData icine yazilir. Dolayisiyla sunucu tarafinda
- * sorgulanabilen tek kapasite kaynagi budur.
- *
- * Icerik serbest bicimli JSON (Map) oldugu icin tum okumalar savunmacidir:
- * eksik/bozuk alan istisna firlatmaz, null doner - tek bir takimin bozuk
- * kaydi tum listeyi dusurmesin.
+ * kaydedilirken content.dashData icine yazilir. Mutabakat: Nezih 2026-09-03
+ * "son kayit yeterli"; guncellik lastUpdated ile izlenir.
  */
 @Service
 public class CapacitySnapshotService {
 
-    /** content.dashData icindeki (frontend kaynakli) alan adlari. */
-    private static final String DASH_DATA = "dashData";
-    private static final String KPIS = "kpis";
-    private static final String PERSONS = "persons";
+    private static final Pattern SPRINT_NO_DIGITS = Pattern.compile("\\d+");
+
+    /**
+     * "En son sunum": once sprint numarasi, esitlikte guncelleme zamani -
+     * PresentationPersistenceAdapter.findLatestPerTeamReadOnly ile AYNI olcut;
+     * aksi halde servis ile uygulamanin "son sunum"u ayrisirdi. Comparator
+     * TERS oldugu icin min() = en son sunum.
+     */
+    private static final Comparator<SprintPresentation> LATEST_FIRST =
+            Comparator.<SprintPresentation>comparingLong(p -> sprintNoRank(p.getSprintNo()))
+                    .thenComparing(SprintPresentation::getUpdatedAt, Comparator.nullsFirst(Comparator.<Instant>naturalOrder()))
+                    .reversed();
 
     private final TeamFacade teamFacade;
     private final PresentationFacade presentationFacade;
@@ -47,150 +47,24 @@ public class CapacitySnapshotService {
     }
 
     public List<TeamCapacitySnapshotDto> listAll() {
-        List<Team> teams = teamFacade.listTeams();
-        if (teams.isEmpty()) {
-            return List.of();
-        }
-        List<Long> teamIds = teams.stream().map(Team::getId).filter(Objects::nonNull).toList();
-        Map<Long, SprintPresentation> latestByTeam = presentationFacade.listLatestPerTeam(teamIds).stream()
-                .filter(p -> p.getTeamId() != null)
-                .collect(Collectors.toMap(SprintPresentation::getTeamId, Function.identity(), (a, b) -> a));
-
-        return teams.stream().map(team -> toSnapshot(team, latestByTeam.get(team.getId()))).toList();
-    }
-
-    private TeamCapacitySnapshotDto toSnapshot(Team team, SprintPresentation presentation) {
-        if (presentation == null) {
-            // Takim var ama henuz hic sunum kaydetmemis - "veri yok" olarak doner.
-            return new TeamCapacitySnapshotDto(team.getId(), team.getName(), null, null, null, null, null,
-                    null, List.of());
-        }
-        Map<String, Object> dashData = asMap(valueOf(presentation.getContent(), DASH_DATA));
-        Map<String, Object> kpis = asMap(valueOf(dashData, KPIS));
-
-        List<MemberCapacitySnapshotDto> members = asList(valueOf(dashData, PERSONS)).stream()
-                .map(this::asMap)
-                .filter(m -> !m.isEmpty())
-                .map(this::toMember)
+        return teamFacade.listTeams().stream()
+                .filter(t -> t.getId() != null)
+                .map(this::toSnapshot)
                 .toList();
+    }
 
-        // Takim geneli "bakim haric kapasite" kayitta ayri bir alan olarak
-        // tutulmuyor (kpis yalnizca ham "kapasite"yi icerir) - dolulugun
-        // paydasi bu oldugu icin kisi satirlarindan toplanir.
-        BigDecimal maintainedTotal = members.stream()
-                .map(MemberCapacitySnapshotDto::maintainedCapacity)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal::add)
+    private TeamCapacitySnapshotDto toSnapshot(Team team) {
+        SprintPresentation latest = presentationFacade.listByTeam(team.getId()).stream()
+                .min(LATEST_FIRST)
                 .orElse(null);
-
-        CapacityTotalsDto totals = kpis.isEmpty() ? null : new CapacityTotalsDto(
-                scaled(kpis.get("toplam")),
-                scaled(kpis.get("tamamlanan")),
-                scaled(kpis.get("acik")),
-                scaled(kpis.get("kapasite")),
-                maintainedTotal,
-                percent(kpis.get("doluluk")),
-                scaled(kpis.get("acikFazla")),
-                status(kpis.get("durum"), kpis.get("doluluk")));
-
-        return new TeamCapacitySnapshotDto(team.getId(), team.getName(), presentation.getSprintNo(),
-                presentation.getDateRange(), text(dashData.get("reportDate")), presentation.getUpdatedAt(),
-                presentation.getCurrentVersion(), totals, members);
+        return CapacitySnapshotMapper.toSnapshot(team, latest, teamFacade.listMembers(team.getId()));
     }
 
-    private MemberCapacitySnapshotDto toMember(Map<String, Object> person) {
-        return new MemberCapacitySnapshotDto(
-                text(person.get("name")),
-                text(person.get("role")),
-                scaled(person.get("toplam")),
-                scaled(person.get("tamamlanan")),
-                scaled(person.get("acik")),
-                scaled(person.get("kapasite")),
-                // Bakim haric kapasite dolulugun paydasidir; kayitta yoksa ham
-                // kapasiteye duser (bkz. useDashboardData).
-                person.get("bakimliKapasite") != null ? scaled(person.get("bakimliKapasite"))
-                        : scaled(person.get("kapasite")),
-                percent(person.get("doluluk")),
-                status(person.get("durum"), person.get("doluluk")));
-    }
-
-    // --- serbest bicimli JSON'dan guvenli okuma yardimcilari ---
-
-    private Object valueOf(Map<String, Object> source, String key) {
-        return source == null ? null : source.get(key);
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> asMap(Object value) {
-        return value instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
-    }
-
-    private List<?> asList(Object value) {
-        return value instanceof List<?> list ? list : List.of();
-    }
-
-    private String text(Object value) {
-        if (value == null) {
-            return null;
+    private static long sprintNoRank(String sprintNo) {
+        if (sprintNo == null) {
+            return -1;
         }
-        String s = String.valueOf(value).trim();
-        return s.isEmpty() ? null : s;
-    }
-
-    /** Sayiyi olcekten BAGIMSIZ okur (yuzde carpimi once yapilabilsin diye). */
-    private BigDecimal raw(Object value) {
-        if (value instanceof Number number) {
-            return new BigDecimal(number.toString());
-        }
-        if (value instanceof String s && !s.isBlank()) {
-            try {
-                return new BigDecimal(s.trim().replace(',', '.'));
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private BigDecimal scaled(Object value) {
-        BigDecimal number = raw(value);
-        return number == null ? null : number.setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /**
-     * Durum etiketi, frontend'deki dStatus (lib/format.js) ile BIREBIR AYNI
-     * turetilir: doluluk bir SAYIYSA kayitli "durum" alani YOK SAYILIR ve etiket
-     * esiklerden hesaplanir; yalnizca doluluk yoksa kayitli durum kullanilir.
-     *
-     * Bu sart, cunku canli onizleme (DashboardSlideCanvas) ve PPTX ciktisi
-     * (dashboardDeckBuilder) de ayni fonksiyonu kullanir - yani PO'nun EKRANDA
-     * GORDUGU etiket budur. Kayitli ham "durum" bayatlayabiliyor: CBS Sprint
-     * 11'de kayitta "Yüksek Risk" yaziyordu ama doluluk 0.63 oldugu icin ekranda
-     * "Uygun" gorunuyordu (kullanici tespiti 2026-09-03). Ham alani aktarmak,
-     * servisin PO'nun gordugunden FARKLI veri vermesine yol aciyordu.
-     *
-     * Esikler (oran uzerinden): >=1.2 Yüksek Risk, >=1.0 Risk, >=0.85 Dikkat.
-     */
-    private String status(Object durum, Object doluluk) {
-        BigDecimal ratio = raw(doluluk);
-        if (ratio == null) {
-            return text(durum);
-        }
-        if (ratio.compareTo(new BigDecimal("1.2")) >= 0) {
-            return "Yüksek Risk";
-        }
-        if (ratio.compareTo(BigDecimal.ONE) >= 0) {
-            return "Risk";
-        }
-        if (ratio.compareTo(new BigDecimal("0.85")) >= 0) {
-            return "Dikkat";
-        }
-        return "Uygun";
-    }
-
-    /** Kayittaki doluluk ORAN'dir (1.59); disariya YUZDE (159.00) olarak verilir. */
-    private BigDecimal percent(Object value) {
-        BigDecimal number = raw(value);
-        return number == null ? null : number.multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP);
+        Matcher m = SPRINT_NO_DIGITS.matcher(sprintNo);
+        return m.find() ? Long.parseLong(m.group()) : -1;
     }
 }

@@ -3,21 +3,25 @@ package com.aksa.capacityplanner.integration.api.dto;
 import java.math.BigDecimal;
 
 /**
- * Takim geneli kapasite ozeti.
+ * Takim geneli kapasite ozeti. Birim: GUN (bkz. TeamCapacitySnapshotDto.unit).
  *
- * Efor/kapasite alanlari GUN cinsindendir. occupancyPercent YUZDEDIR (orn.
- * 159.00 = %159) - kayitta oran olarak (1.59) durdugu icin 100 ile carpilarak
- * verilir, cagiran tarafta birim karisikligi olmasin.
+ * plannedEffort/completedEffort/openEffort KUMULATIFTIR: sprintin kendi isi
+ * degil, kapasite doneminin (capacityPeriod) basindan beri birikmis toplam.
+ * capacity = donem sonuna kalan ham is gunu; maintainedCapacity = bakim/SR
+ * payi dusulmus hali. occupancyPercent 0-100 olcegindedir (165.95 = %165,95)
+ * ve her ekibin kendi Excel raporundan gelir - dashboard yeniden HESAPLAMAZ,
+ * oldugu gibi gosterir (sozlesme temel ilkesi).
  *
- * Kapasite IKI alan halinde verilir, cunku doluluk HAM kapasiteye degil BAKIM
- * HARIC kapasiteye gore hesaplanir:
- *   capacity            - ham kalan kapasite
- *   maintainedCapacity  - bakim/SR payi dusulmus kapasite (dolulugun PAYDASI)
- * Yani occupancyPercent ~= openEffort / maintainedCapacity * 100. Tek bir
- * "capacity" alani verilseydi cagiran taraf yuzdeyi tutturamazdi.
+ * fte                 : "Is Yuku FTE" (K4) - yalnizca FTE takibi olan takimda
+ *                       (RPA) dolu, digerlerinde null.
+ * reported*           : PO'nun forma KENDI girdigi donem degerleri (Yeni
+ *                       Eklenen / Donem Kapanan / Net Degisim) - turetilmis
+ *                       degil, beyan edilmis; girilmediyse null.
  */
 public record CapacityTotalsDto(BigDecimal plannedEffort, BigDecimal completedEffort, BigDecimal openEffort,
                                  BigDecimal capacity, BigDecimal maintainedCapacity,
                                  BigDecimal occupancyPercent, BigDecimal capacityGap,
-                                 String status) {
+                                 String status, BigDecimal fte,
+                                 BigDecimal reportedClosedEffort, BigDecimal reportedAddedEffort,
+                                 BigDecimal reportedNetChange) {
 }

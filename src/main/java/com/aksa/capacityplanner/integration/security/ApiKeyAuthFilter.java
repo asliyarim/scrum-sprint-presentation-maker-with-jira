@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,19 +18,23 @@ import java.util.List;
 
 /**
  * /api/integration/** yollarini SERVIS ANAHTARIYLA (kullanici oturumu olmadan)
- * dogrular. Kapasite verisini baska bir projede kullanacak ekip tarayici
+ * dogrular. Kapasite/kazanim verisini dis dashboard'da kullanacak ekip tarayici
  * cookie'si tasiyamadigi icin bu yol acildi (talep: Nezih, 2026-09-03).
  *
- * Anahtar dogruysa SecurityContext'e ROLE_INTEGRATION yazilir. Yanlis/eksikse
- * HICBIR SEY yazilmaz; SecurityConfig'teki anyRequest().authenticated() kurali
- * istegi 401 ile reddeder. Boylece yeni bir permitAll yolu ACILMAZ ve mevcut
- * cookie tabanli akis (JwtCookieAuthFilter) hic etkilenmez.
+ * Anahtar dogruysa SecurityContext'e ROLE_INTEGRATION yazilir ve zincir
+ * devam eder. Yanlis/eksikse istek BURADA 401 + JSON govdeyle biter
+ * ({"error": "..."} - sozlesme bolum 4 "Hata durumu"); daha once govde bos
+ * donuyordu. /api/integration/ disindaki yollarda filtre HICBIR SEY yapmaz -
+ * mevcut cookie tabanli akis (JwtCookieAuthFilter) etkilenmez. Yeni bir
+ * permitAll yolu da ACILMAZ: SecurityConfig'teki hasRole("INTEGRATION")
+ * kurali yerinde durur, bu filtre sadece onun onunde net bir hata govdesi verir.
  */
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
     public static final String PATH_PREFIX = "/api/integration/";
     private static final String API_KEY_HEADER = "X-API-Key";
     private static final String BEARER_PREFIX = "Bearer ";
+    static final String UNAUTHORIZED_BODY = "{\"error\":\"Gecersiz ya da eksik API anahtari.\"}";
 
     private final String configuredKey;
 
@@ -39,11 +45,20 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        if (request.getRequestURI().startsWith(PATH_PREFIX) && isValid(presentedKey(request))) {
-            var authentication = new UsernamePasswordAuthenticationToken(
-                    "integration", null, List.of(new SimpleGrantedAuthority("ROLE_INTEGRATION")));
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+        if (!request.getRequestURI().startsWith(PATH_PREFIX)) {
+            filterChain.doFilter(request, response);
+            return;
         }
+        if (!isValid(presentedKey(request))) {
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+            response.getWriter().write(UNAUTHORIZED_BODY);
+            return;
+        }
+        var authentication = new UsernamePasswordAuthenticationToken(
+                "integration", null, List.of(new SimpleGrantedAuthority("ROLE_INTEGRATION")));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
         filterChain.doFilter(request, response);
     }
 

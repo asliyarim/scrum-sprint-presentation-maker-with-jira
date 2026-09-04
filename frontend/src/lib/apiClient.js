@@ -219,6 +219,27 @@ export async function fetchTeams() {
   return requestJson("/api/teams");
 }
 
+/**
+ * Bir takımın "Zaman Dışı Kazanımlar" kayıtları (tüm dönemler). Dış dashboard
+ * bunu değil /api/integration/benefits ucunu okur; bu uç uygulama içi giriş
+ * ekranı (BenefitsAdminPage) içindir.
+ */
+export async function fetchTeamBenefits(teamId) {
+  return requestJson(`/api/teams/${teamId}/benefits`);
+}
+
+/**
+ * Bir dönemin kazanım değerlerini topluca yazar (varsa günceller). entries:
+ * [{ key, processCount|null, value|null, currency|null }]. Yetkisiz takıma
+ * yazma 403 fırlatır (backend BenefitFacade, sunumlarla aynı kural).
+ */
+export async function saveTeamBenefits(teamId, period, entries) {
+  return requestJson(`/api/teams/${teamId}/benefits/${encodeURIComponent(period)}`, {
+    method: "PUT",
+    body: JSON.stringify({ entries }),
+  });
+}
+
 /** Bir takıma ait kayıtlı sprint sunumlarının özet listesini döner. */
 export async function fetchPresentations(teamId) {
   return requestJson(`/api/presentations?teamId=${teamId}`);

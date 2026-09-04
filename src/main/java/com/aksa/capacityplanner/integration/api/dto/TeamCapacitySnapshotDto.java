@@ -4,20 +4,29 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Bir takimin EN SON KAYDEDILEN sunumundaki kapasite verisi.
+ * Bir takimin EN SON KAYDEDILEN sunumundaki kapasite verisi (dis dashboard
+ * sozlesmesi - Nezih, gereksinim dokumani 04.09.2026, bolum 2 ve 4).
  *
- * Kapasite, dashboard akisinda kalici olarak yalnizca sunum kaydedilirken
- * (content.dashData) saklanir - bu yuzden kaynak "son kayit"tir (mutabakat:
- * Nezih, 2026-09-03: "son kayit yeterli").
+ * apiVersion          : SOZLESME surumu. Alan adi degisikligi/kaldirma bunu
+ *                       artirir (bolum 4 "Degisiklik yonetimi"). Sunumun kendi
+ *                       surumu ayri alandadir (presentationVersion) - eskiden
+ *                       "version" adiyla veriliyordu ve sozlesme surumuyle
+ *                       karistiriliyordu.
+ * projectKey          : Jira proje anahtari (K1) - dashboard takimi bununla baglar.
+ * unit                : efor/kapasite alanlarinin birimi (K3) - her zaman "day".
+ * sprintNo/dateRange  : sunumun kendi sprinti ve tarih araligi.
+ * capacityPeriod      : KAPASITE HESABININ PENCERESI (orn. "01 Haziran – 31
+ *                       Aralık 2026"). Bolum 2.2'deki "10 is gunluk sprintte
+ *                       94 gun kapasite olamaz" sorusunun cevabi: kapasite
+ *                       sprintin degil, rapor tarihinden donem sonuna kalan
+ *                       is gunudur; efor da donem basindan beri birikmistir.
+ * lastUpdated         : sunumun son kaydedilme zamani (veri guncelligi).
  *
- * lastUpdated: o sunumun son kaydedilme zamani. Cagiran taraf veri
- * guncelligini bununla takip eder (Nezih istegi: "guncelleme tarihi koy api
- * icine ben yakalarim veri guncelligini").
- *
- * Hic sunum kaydetmemis takimlar da listede DONER - totals null, members bos
- * gelir; boylece cagiran taraf "veri yok" ile "sifir kapasite"yi ayirt eder.
+ * Hic sunum kaydetmemis takimlar da DONER - totals null, members bos.
  */
-public record TeamCapacitySnapshotDto(Long teamId, String teamName, String sprintNo, String dateRange,
-                                        String reportDate, Instant lastUpdated, Integer version,
+public record TeamCapacitySnapshotDto(int apiVersion, Long teamId, String teamName, String projectKey,
+                                        String unit, String sprintNo, String dateRange,
+                                        String capacityPeriod, String reportDate,
+                                        Instant lastUpdated, Integer presentationVersion,
                                         CapacityTotalsDto totals, List<MemberCapacitySnapshotDto> members) {
 }

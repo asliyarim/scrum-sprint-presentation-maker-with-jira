@@ -19,6 +19,7 @@ import {
 import ProfilePage from "./components/shared/ProfilePage";
 import AdminHomePage from "./components/shared/AdminHomePage";
 import MonitoringPage from "./components/shared/MonitoringPage";
+import BenefitsAdminPage from "./components/shared/BenefitsAdminPage";
 import PresentationsPage from "./components/shared/PresentationsPage";
 import JointPresentationPage from "./components/shared/JointPresentationPage";
 import TopBar from "./components/shared/TopBar";
@@ -213,6 +214,18 @@ export default function App() {
           element={
             personnel && isAdmin ? (
               <MonitoringPage personnel={personnel} theme={theme} onToggleTheme={toggleTheme} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        {/* "Zaman Disi Kazanimlar" girisi - dis dashboard'un
+            /api/integration/benefits ucuna veri kaynagi (Nezih, 04.09.2026). */}
+        <Route
+          path="/admin/kazanimlar"
+          element={
+            personnel && isAdmin ? (
+              <BenefitsAdminPage personnel={personnel} theme={theme} onToggleTheme={toggleTheme} />
             ) : (
               <Navigate to="/" replace />
             )
