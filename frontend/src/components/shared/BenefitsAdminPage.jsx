@@ -68,7 +68,11 @@ export default function BenefitsAdminPage({ personnel, theme, onToggleTheme }) {
 
   useEffect(() => {
     fetchTeams()
-      .then((data) => {
+      .then((all) => {
+        // Kazanim ucu yalnizca RPA tipini doner (backend
+        // BenefitsSnapshotService.isBenefitTeam) - servisin hic vermeyecegi bir
+        // takima veri girilmesin diye burada da ayni filtre uygulanir.
+        const data = (all || []).filter((t) => t.teamType === "RPA");
         setTeams(data);
         if (data.length > 0) setSelectedTeamId(data[0].id);
       })
