@@ -9,10 +9,11 @@ import SlideCanvas from "../sprint/SlideCanvas";
 import DashboardSlideCanvas from "../dashboard/DashboardSlideCanvas";
 import VelocityBurndownSlideCanvas from "../sprint/VelocityBurndownSlideCanvas";
 import { IconUsers, IconCheckCircle, IconLayers, IconDownload } from "./icons";
-import { fetchTeams, fetchPresentations, fetchLatestPresentationsByTeams, fetchPresentationVersions, fetchPresentationVersion, recordPresentationDownload } from "../../lib/apiClient";
+import { fetchTeams, fetchPresentations, fetchLatestPresentationsByTeams, fetchPresentationVersions, fetchPresentationVersion, recordPresentationDownload, saveJointPresentation } from "../../lib/apiClient";
 import { sprintDataFromContent } from "../../lib/presentationContent";
+import { toSavablePicks } from "../../lib/jointPicks";
 import { sortBySprintNo } from "../../lib/sprintNumbers";
-import { buildJointDeck, commonEndDate } from "../../lib/jointDeckBuilder";
+import { buildJointDeck, commonEndDate, JOINT_COVER_TITLE, JOINT_COVER_SUBTITLE } from "../../lib/jointDeckBuilder";
 import { SECTION_KEYS, linesOf } from "../../lib/geometry";
 import { ASSETS } from "../../assets/pptxAssets";
 import { resolveIsAdmin } from "../../lib/teamTypes";
@@ -162,7 +163,13 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
   // sekmesi sadece teamName/subtitle okur (bkz. SlideCanvas.jsx), ayri bir
   // bilesen yazmaya gerek kalmadan aynen PPTX'teki addJointCoverSlide ile
   // AYNI baslik + ortak bitis tarihini gosterir.
-  const jointCoverData = { teamName: "Ortak Sprint Sunumu", subtitle: commonEndDate(results || []) };
+  // Baslik/alt baslik PPTX kapagiyla TEK kaynaktan gelir (JOINT_COVER_*)
+  // ki onizleme ile indirilen dosya ayrismasin.
+  const jointCoverEnd = commonEndDate(results || []);
+  const jointCoverData = {
+    teamName: JOINT_COVER_TITLE,
+    subtitle: jointCoverEnd ? `${JOINT_COVER_SUBTITLE} · ${jointCoverEnd}` : JOINT_COVER_SUBTITLE,
+  };
 
   useEffect(() => {
     fetchTeams()
@@ -315,13 +322,44 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
   // durumdayken tekrar acmak icin.
   const [runnerOpen, setRunnerOpen] = useState(false);
 
+  // Ortak sunumu kaydetme durumu - bkz. "Ortak Sunumu Kaydet" butonu.
+  const [saving, setSaving] = useState(false);
+  const [savedInfo, setSavedInfo] = useState(null);
+
+  /**
+   * Secilen sunumlari KAYIT olarak saklar. Icerik kopyalanmaz; yalnizca
+   * (presentationId, version) + gosterim bilgileri yazilir, tekrar indirilirken
+   * icerik versions tablosundan taze okunur (bkz. lib/jointPicks).
+   */
+  const handleSaveJoint = async () => {
+    if (!results || results.length === 0) return;
+    setSaving(true);
+    setError(null);
+    setSavedInfo(null);
+    try {
+      const baslik = `Ortak Sunum · ${commonEndDate(results) || new Date().toLocaleDateString("tr-TR")}`;
+      const saved = await saveJointPresentation(baslik, toSavablePicks(results));
+      setSavedInfo(`${saved.title} kaydedildi (${results.length} takım). Admin panelindeki "Ortak Sunumlar" bölümünden tekrar indirilebilir.`);
+    } catch (err) {
+      setError(err?.message || err?.error || "Ortak sunum kaydedilemedi.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleJointExport = async (cornerMesh) => {
     if (!results || results.length === 0) return;
     setExporting(true);
     setError(null);
     try {
       const pptx = await buildJointDeck(results, assets, theme === "dark" ? "dark" : "light", cornerMesh);
-      await pptx.writeFile({ fileName: "Ortak_Sprint_Sunumu.pptx" });
+      // Dosya adi PO'larin kullandigi bicimle ayni: "07-09-2026 Dijital
+      // Uygulamalar ve Ürün Geliştirme - Sprint Raporları.pptx" (Gözde'nin
+      // paylastigi ornek dosya, 2026-09-07).
+      const g = new Date();
+      const iki = (n) => String(n).padStart(2, "0");
+      const tarih = `${iki(g.getDate())}-${iki(g.getMonth() + 1)}-${g.getFullYear()}`;
+      await pptx.writeFile({ fileName: `${tarih} ${JOINT_COVER_TITLE} - ${JOINT_COVER_SUBTITLE}.pptx` });
       await recordPresentationDownload("BATCH", [...new Set(results.map((r) => r.teamId))]).catch(() => {
         // indirme kaydi best-effort - basarisiz olsa da kullaniciyi engellemez
       });
@@ -513,7 +551,20 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
                     PPTX İndir (Ortak)
                   </Button>
                 )}
+                {/* Kaydetme: birlestirmenin KENDISI degil, secilen (sunum, surum)
+                    listesi saklanir - admin panelinde tarih tarih gorunur ve
+                    tekrar indirilebilir (Cagdas Bey istegi, 2026-09-07). */}
+                {results && results.length > 0 && (
+                  <Button variant="soft" loading={saving} loadingLabel="Kaydediliyor…" onClick={handleSaveJoint}>
+                    Ortak Sunumu Kaydet
+                  </Button>
+                )}
               </div>
+              {savedInfo && (
+                <div className="login-error" style={{ marginTop: 10, background: "rgba(22,163,74,.10)", color: "#15803d", borderColor: "#86efac" }}>
+                  ✓ {savedInfo}
+                </div>
+              )}
             </>
           )}
         </div>

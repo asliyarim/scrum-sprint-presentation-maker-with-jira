@@ -38,17 +38,10 @@ export const GROW_ITEM_THRESHOLD = 5;
 // fontta bile) sigmayan durumda son care olarak yapilir.
 export const GROW_THEN_SHRINK = [...GROW_CANDIDATES, ...FS_CANDIDATES.slice(1)];
 
-// Bir SUTUNDA (ust + alt kart birlikte) gosterilecek EN FAZLA madde sayisi.
-// Sol sutun = Tamamlanan Isler + Riskler, sag sutun = Yapilacak Isler +
-// Bekleyen Konular. Bu sinir olmadan tek olcut geometriydi: yazi FS_MIN'e
-// (4pt) kadar kuculdukten SONRA kirpma basliyordu, yani "+N madde" uyarisi
-// ancak okunamayacak kadar kucuk bir yazida goruluyordu.
-//
-// Sinir kart basina DEGIL sutun basina konur (kullanici istegi 2026-08-24):
-// iki kart ayni dikey butceyi paylastigi icin, bos duran ustteki kartin payi
-// alttakine kalabilsin - kart basina sabit 7 dendiginde 2 riskli bir sutunda
-// 12 tamamlanan is bosuna kirpiliyordu.
-export const MAX_ITEMS_PER_COLUMN = 14;
+// NOT: MAX_ITEMS_PER_COLUMN (sutun basina 14 madde siniri) KALDIRILDI
+// (kullanici karari 2026-09-07). Madde sayisina gore kirpma yapilmaz; PO'nun
+// yazdigi tum maddeler slayta girer, sigdirma yalnizca yazi boyutuyla olur -
+// bkz. fitContent. Slaytta artik "+N madde" notu HIC gorunmez.
 
 // Sutunlar: [ust kart, alt kart].
 const COLUMN_KEYS = [["done", "risk"], ["active", "pending"]];
@@ -269,11 +262,14 @@ export function pickCardFS(items, availH) {
  * farkli yuksekliklerde olabilir. Boylece bir sutundaki bos kart, ayni satirdaki
  * dolu kartin yerini daraltmaz.
  *
- * Kirpma IKI asamalidir: once sutun basina MAX_ITEMS_PER_COLUMN siniri uygulanir
- * (okunabilirlik icin sabit ust sinir), sonra -metinler cok uzunsa- en kucuk
- * font boyutunda (FS_MIN) bile sigmayan maddeler en dolu karttan atilir. Her
- * iki durumda da fazlalik gorunmeden kaybolmaz, yerine "+N madde" notu
- * birakilir.
+ * MADDE KIRPMA YOKTUR (kullanici karari 2026-09-07: "madde restriction kalksin,
+ * kendileri okunabiliyor mu diye bakarlar"). PO ne yazdiysa TAMAMI slayta
+ * girer; sigdirma YALNIZCA yazi boyutuyla yapilir - az maddeli kart buyur
+ * (GROW_CANDIDATES), cok maddeli kart FS_MIN'e (4pt) kadar kuculur. En kucuk
+ * puntoda bile sigmiyorsa tasmaya izin verilir; PO onizlemede gorup kendi
+ * kisaltir. Eskiden once sutun basina 14 madde siniri uygulanir, sonra da
+ * geometri geregi madde atilip yerine "+N madde" notu birakilirdi - ikisi de
+ * kaldirildi.
  *
  * Onizleme (SlideCanvas) ve PPTX (sprintDeckBuilder) AYNI fonksiyonu kullanir,
  * ikisi de senkron kalir.
@@ -284,37 +280,9 @@ export function fitContent(d, cardsTop) {
   const items = { done: [...d.done], active: [...d.active], risk: [...d.risk], pending: [...d.pending] };
   const ladder = {};
   const idx = {};
-  const removed = { done: 0, active: 0, risk: 0, pending: 0 };
 
-  // Once SAYI sinirini uygula (geometriden bagimsiz): fazlasi zaten okunabilir
-  // bir yazi boyutuyla sigmazdi, kirpmayi FS_MIN'e kadar ertelemek yerine
-  // burada kirpip kullaniciya "+N madde" uyarisini ERKEN gosteriyoruz.
-  //
-  // Sutun butcesi asilirsa her adimda O AN DAHA COK MADDESI OLAN karttan bir
-  // madde kirpilir; boylece az maddeli kart hic dokunulmadan kalir (orn. 20
-  // tamamlanan is + 2 risk -> 12 + 2) ve iki kart da doluysa yuk esit dagilir
-  // (orn. 20 + 20 -> 7 + 7).
-  COLUMN_KEYS.forEach(([ust, alt]) => {
-    while (items[ust].length + items[alt].length > MAX_ITEMS_PER_COLUMN) {
-      const k = items[ust].length >= items[alt].length ? ust : alt;
-      items[k].pop();
-      removed[k]++;
-    }
-  });
-
-  // Not KISA tutulur: slaytta yer kaplayan bir aciklama degil, sadece kac
-  // maddenin gorunmedigini soyleyen bir sayac (kullanici istegi 2026-08-24).
-  const noteText = (k) => `+${removed[k]} madde`;
-
-  /**
-   * Kartta GERCEKTEN cizilecek satirlar: maddeler + (varsa) "+N madde"
-   * notu. Not, olcumlerin TAMAMINDA hesaba katilmalidir - onceki surumde
-   * kartlar not eklenmeden once olculuyor, not en sonda push ediliyordu; iki
-   * satira saran bu uyari kartlari buyutup alt satiri slayt zemininin (ve mavi
-   * altbilgi seridinin) disina tasiriyordu - uyari da o gorunmeyen alanda
-   * kaldigi icin Riskler/Bekleyen Konular kartlarinda hic okunamiyordu.
-   */
-  const shown = (k) => (removed[k] > 0 ? items[k].concat(noteText(k)) : items[k]);
+  /** Kartta cizilecek satirlar - artik maddelerin TAMAMI (kirpma/not yok). */
+  const shown = (k) => items[k];
 
   SECTION_KEYS.forEach((k) => {
     ladder[k] = ladderFor(shown(k));
@@ -348,19 +316,24 @@ export function fitContent(d, cardsTop) {
       while (idx[k] < ladder[k].length - 1 && cardH(shown(k), fsOf(k)) > butce) idx[k]++;
     });
 
+    // Iki kart butceyi asiyorsa YALNIZCA yazi boyutu kucultulur; her adimda o
+    // an DAHA UZUN olan kart bir kademe iner. Ikisi de en kucuk puntoya
+    // (FS_MIN) geldiyse dongu biter ve TASMAYA IZIN VERILIR - madde ATILMAZ
+    // (bkz. fonksiyon basindaki not, kullanici karari 2026-09-07).
     let guard = 0;
     while (guard++ < 2000) {
       const hU = cardH(shown(ust), fsOf(ust));
       const hA = cardH(shown(alt), fsOf(alt));
       if (hU + hA <= butce) break;
       const tallerKey = hU >= hA ? ust : alt;
-      if (idx[tallerKey] < ladder[tallerKey].length - 1) {
-        idx[tallerKey]++;
+      if (idx[tallerKey] >= ladder[tallerKey].length - 1) {
+        // Uzun olan kart zaten FS_MIN'de; digeri de kuculemiyorsa cikilir.
+        const otherKey = tallerKey === ust ? alt : ust;
+        if (idx[otherKey] >= ladder[otherKey].length - 1) break;
+        idx[otherKey]++;
         continue;
       }
-      if (items[tallerKey].length <= 1) break; // daha fazla kucultulemez/kirpilamaz, tasmaya izin ver
-      items[tallerKey].pop();
-      removed[tallerKey]++;
+      idx[tallerKey]++;
     }
 
     const dogal = { ust: cardH(shown(ust), fsOf(ust)), alt: cardH(shown(alt), fsOf(alt)) };

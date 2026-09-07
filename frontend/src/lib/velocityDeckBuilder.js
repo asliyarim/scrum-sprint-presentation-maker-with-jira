@@ -140,3 +140,17 @@ export async function addVelocityBurndownSlide(pptx, data, veloData, assets, the
   s.addText(`Gizli & Dahili Kullanım   |   ${footerTeam}`, { x: 0.4, y: 7.14, w: 7, h: 0.36, fontFace: "Calibri", fontSize: 10, color: "D6E4EA", margin: 0, valign: "middle" });
   return s;
 }
+
+/**
+ * Bu takim icin Velocity & Burndown slaydi uretilmeli mi? PO en az bir gorsel
+ * yuklediyse evet. Ikisi de yoksa slayt HIC eklenmez - burndown/velocity
+ * kullanmayan ekiplerin (orn. Mobil Uygulamalar) ciktisinda bos bir
+ * "yüklenmedi" sayfasi kaliyordu (kullanici karari 2026-09-07: "eklenmeyen
+ * ekipler icin bos sayfayi kaldiralim"). Tekil (fullDeckBuilder) ve ortak
+ * (jointDeckBuilder) sunum AYNI kurali kullanir.
+ */
+export function hasVelocityContent(veloData) {
+  const v = veloData || {};
+  const dolu = (u) => typeof u === "string" && u.trim() !== "";
+  return dolu(v.burndownUrl) || dolu(v.velocityUrl);
+}

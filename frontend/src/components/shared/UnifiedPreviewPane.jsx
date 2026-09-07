@@ -4,6 +4,11 @@ import VelocityBurndownSlideCanvas from "../sprint/VelocityBurndownSlideCanvas";
 import SourceTabs from "./SourceTabs";
 import { useCanvasFit } from "../../hooks/useCanvasFit";
 
+// NOT: Velocity & Burndown sekmesi gorsel yuklenmemis olsa da ONIZLEMEDE
+// HEP gosterilir (kullanici karari 2026-09-07) - PO gorseli eklemeyi
+// unuttuysa bos sayfayi gorup fark edebilsin diye. Bos sayfa yalnizca
+// INDIRILEN PPTX'e ve ortak sunuma girmez
+// (bkz. velocityDeckBuilder.hasVelocityContent).
 const TABS = [
   { key: "cover", label: "Kapak" },
   { key: "content", label: "İçerik Slaytı" },

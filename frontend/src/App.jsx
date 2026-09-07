@@ -93,6 +93,10 @@ function odysseyeDon() {
 
 // ZoomModal ("⤢ Preview") ve ExportPreviewModal ("PPTX İndir" oncesi onizleme)
 // AYNI 4 sekmeyi kullanir - tek yerden tanimlanir.
+// NOT: Velocity & Burndown sekmesi gorsel yuklenmemis olsa da onizlemede HEP
+// kalir (kullanici karari 2026-09-07) - PO eklemeyi unuttuysa fark etsin diye.
+// Bos sayfa yalnizca indirilen PPTX'e ve ortak sunuma girmez
+// (bkz. velocityDeckBuilder.hasVelocityContent).
 const PREVIEW_TABS = [
   { key: "cover", label: "Kapak" },
   { key: "content", label: "İçerik Slaytı" },

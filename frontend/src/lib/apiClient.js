@@ -220,6 +220,31 @@ export async function fetchTeams() {
 }
 
 /**
+ * Kaydedilmiş ortak (çoklu takım) sunumlar - en yeni önce. Admin panelinde
+ * "tarih tarih" listelenir (Çağdaş Bey isteği, 2026-09-07).
+ */
+export async function fetchJointPresentations() {
+  return requestJson("/api/joint-presentations");
+}
+
+/**
+ * Ortak sunumu kaydeder. picks: [{ presentationId, version, teamId, teamName,
+ * sprintNo, dateRange }] - sunum içeriği KAYDEDİLMEZ, tekrar indirilirken
+ * bu listeden yeniden üretilir (bkz. lib/jointPicks.loadJointResults).
+ */
+export async function saveJointPresentation(title, picks) {
+  return requestJson("/api/joint-presentations", {
+    method: "POST",
+    body: JSON.stringify({ title, picks }),
+  });
+}
+
+/** Kaydedilmiş ortak sunumu siler - yalnızca admin ya da kaydı oluşturan (403 aksi halde). */
+export async function deleteJointPresentation(id) {
+  return requestJson(`/api/joint-presentations/${id}`, { method: "DELETE" });
+}
+
+/**
  * Bir takımın "Zaman Dışı Kazanımlar" kayıtları (tüm dönemler). Dış dashboard
  * bunu değil /api/integration/benefits ucunu okur; bu uç uygulama içi giriş
  * ekranı (BenefitsAdminPage) içindir.

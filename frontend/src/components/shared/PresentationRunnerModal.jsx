@@ -4,7 +4,7 @@ import Button from "./Button";
 import SlideCanvas from "../sprint/SlideCanvas";
 import DashboardSlideCanvas from "../dashboard/DashboardSlideCanvas";
 import VelocityBurndownSlideCanvas from "../sprint/VelocityBurndownSlideCanvas";
-import { commonEndDate } from "../../lib/jointDeckBuilder";
+import { commonEndDate, JOINT_COVER_TITLE, JOINT_COVER_SUBTITLE } from "../../lib/jointDeckBuilder";
 import { useCanvasFit } from "../../hooks/useCanvasFit";
 import { useCountdown, formatMmSs } from "../../hooks/useCountdown";
 import { useFullscreen } from "../../hooks/useFullscreen";
@@ -65,7 +65,15 @@ export default function PresentationRunnerModal({ open, onClose, queue, assets }
       out.push({
         key: "joint-cover",
         teamIndex: -1,
-        item: { teamName: "Ortak Sprint Sunumu", subtitle: commonEndDate(queue) },
+        // Kapak metni PPTX/onizleme ile TEK kaynaktan (JOINT_COVER_*) gelir -
+        // uc yerde ayri ayri yazilinca biri guncellenmeden kalabiliyordu.
+        item: {
+          teamName: JOINT_COVER_TITLE,
+          subtitle: (() => {
+            const bitis = commonEndDate(queue);
+            return bitis ? `${JOINT_COVER_SUBTITLE} · ${bitis}` : JOINT_COVER_SUBTITLE;
+          })(),
+        },
         kind: "cover",
         label: "Kapak",
       });

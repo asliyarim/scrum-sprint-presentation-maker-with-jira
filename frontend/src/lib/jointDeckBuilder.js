@@ -1,8 +1,16 @@
 import PptxGenJS from "pptxgenjs";
 import { addContentSlide } from "./sprintDeckBuilder";
 import { addDashboardSlide } from "./dashboardDeckBuilder";
-import { addVelocityBurndownSlide } from "./velocityDeckBuilder";
+import { addVelocityBurndownSlide, hasVelocityContent } from "./velocityDeckBuilder";
 import { DEFAULT_CORNER_MESH } from "../assets/cornerMesh";
+
+/**
+ * Ortak sunum kapagindaki metinler - PO larin kullandigi resmi sunum kapagiyla
+ * ayni (Gözde, 2026-09-07). Tek yerden degistirilebilsin diye sabit;
+ * JointPresentationPage onizlemesi de AYNI degerleri kullanir.
+ */
+export const JOINT_COVER_TITLE = "Dijital Uygulamalar ve Ürün Geliştirme";
+export const JOINT_COVER_SUBTITLE = "Sprint Raporları";
 
 // Resim1 kose-mesh dekorasyonunun gercek en-boy orani (658x960 kaynak PNG).
 const CORNER_MESH_RATIO = 658 / 960;
@@ -74,11 +82,17 @@ function addJointCoverSlide(pptx, teamsPayload, assets, cornerMesh = DEFAULT_COR
   }
   s.addImage({ data: assets.logo_a, x: 0.55, y: 0.42, w: 1.35, h: 1.35 * (63 / 308) });
   s.addImage({ data: assets.logo_b, x: 2.15, y: 0.36, w: 1.05, h: 1.05 * (83 / 227) });
-  s.addText("Ortak Sprint Sunumu", { x: 0.55, y: 5.15, w: 5.6, h: 0.9, fontFace: "Calibri", fontSize: 36, bold: true, color: TEAL, margin: 0 });
+  // Kapak metni PO'larin kullandigi resmi sunum kapagiyla AYNI (Gözde,
+  // 2026-09-07: "ortak sunum hazirla dedigimizde 'Ortak Sprint Sunumu'
+  // dememesi lazim" + ornek dosya "13-07-2026 Dijital Uygulamalar...pptx"):
+  // birim adi baslik, "Sprint Raporları" alt baslik. Ortak bitis tarihi
+  // bilgilendirici oldugu icin korunur, alt satira alinir.
+  s.addText(JOINT_COVER_TITLE, { x: 0.55, y: 4.75, w: 5.6, h: 1.3, fontFace: "Calibri", fontSize: 30, bold: true, color: TEAL, margin: 0, valign: "bottom" });
   s.addShape(pptx.ShapeType.line, { x: 0.6, y: 6.05, w: 2.6, h: 0, line: { color: ORANGE, width: 2.25 } });
+  s.addText(JOINT_COVER_SUBTITLE, { x: 0.55, y: 6.12, w: 5.6, h: 0.42, fontFace: "Calibri", fontSize: 18, color: INK, margin: 0 });
   const endDate = commonEndDate(teamsPayload);
   if (endDate) {
-    s.addText(endDate, { x: 0.55, y: 6.12, w: 5.6, h: 0.5, fontFace: "Calibri", fontSize: 18, color: INK, margin: 0 });
+    s.addText(endDate, { x: 0.55, y: 6.54, w: 5.6, h: 0.42, fontFace: "Calibri", fontSize: 13, color: INK, margin: 0 });
   }
   return s;
 }
@@ -113,7 +127,11 @@ export async function buildJointDeck(teamsPayload, assets, theme = "light", corn
     // bkz. addDashboardSlide) - eskiden o takimin kapasite sayfasi ortak
     // sunumdan sessizce dusuyordu.
     addDashboardSlide(pptx, t.dashData, assets, theme, mesh);
-    await addVelocityBurndownSlide(pptx, t.sprintData, t.veloData, assets, theme);
+    // Velocity/Burndown gorseli olmayan takimda slayt HIC eklenmez - ortak
+    // sunumda da tekil sunumla AYNI kural (bkz. hasVelocityContent).
+    if (hasVelocityContent(t.veloData)) {
+      await addVelocityBurndownSlide(pptx, t.sprintData, t.veloData, assets, theme);
+    }
   }
   return pptx;
 }
