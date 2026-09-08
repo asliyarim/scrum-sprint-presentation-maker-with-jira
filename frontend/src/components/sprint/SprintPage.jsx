@@ -21,11 +21,29 @@ const SECTION_TITLES_TR = {
  * DB'de zaten senkronize edilmis olani okur (Kapasite Dashboard'un "Jira'dan"
  * sekmesindeki "Çek sonra Yenile" deseniyle ayni, bkz. useJiraDashboard.js).
  */
-export default function SprintPage({ form, band, excel, jira, teamId, jiraProjectKey, assets, onExpandSection, sectorOptions }) {
+export default function SprintPage({ form, band, excel, jira, teamId, jiraProjectKey, assets, onExpandSection, sectorOptions, readability }) {
   const SEC = sectionDefs(assets);
 
   return (
     <section>
+      {/* Madde sayisina sinir yok; cok madde girilince yazi kuculuyor ve bir
+          yerden sonra okunmuyor. Slayta MUDAHALE ETMEK yerine PO uyarilir
+          (kullanici karari 2026-09-07), kisaltma karari onundur.
+          bkz. geometry.contentReadability / FS_READABLE_MIN. */}
+      {readability && (
+        <div className="warn" role="status" style={{ margin: "0 0 10px", lineHeight: 1.55 }}>
+          <b>
+            {readability.critical
+              ? "Bu slayttaki yazı okunmayacak kadar küçük."
+              : "Bu slayttaki yazı oldukça küçüldü."}
+          </b>{" "}
+          Toplam <b>{readability.itemCount} madde</b> var, hepsi slayda sığsın diye punto{" "}
+          <b>{readability.fs}pt</b>'ye düştü
+          {readability.critical && " — önizlemede kartlar boş görünebilir, sunumda da okunmaz"}.
+          Maddelerin tamamı korunuyor, hiçbiri atılmadı; okunur hale getirmek için maddeleri
+          kısaltabilir veya bir kısmını çıkarabilirsin.
+        </div>
+      )}
       {excel.info && <div className="excelinfo" style={{ marginBottom: 10 }}>{excel.info}</div>}
       <BandEditorPanel band={band} hasFte={hasFteTracking(form.teamType)} />
       <p className="panelttl">{SECTION_TITLES_TR.done}</p>

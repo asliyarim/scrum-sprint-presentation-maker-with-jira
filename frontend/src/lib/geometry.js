@@ -38,6 +38,26 @@ export const GROW_ITEM_THRESHOLD = 5;
 // fontta bile) sigmayan durumda son care olarak yapilir.
 export const GROW_THEN_SHRINK = [...GROW_CANDIDATES, ...FS_CANDIDATES.slice(1)];
 
+// Slaytta okunabilir kabul edilen en kucuk punto. Madde siniri kaldirildiktan
+// sonra cok maddeli slaytlar FS_MIN'e (4pt) kadar kuculebiliyor; onizleme
+// tuvali 1280px olup sag panelde ~0.33 olcekle cizildigi icin 4pt ekranda
+// ~2 piksele denk geliyor ve kart BOS gorunuyor (kullanici bildirimi
+// 2026-09-07: "Gozde'nin 10 ve 11. sprintlerin icerik slayti bos gorunuyor" -
+// Urun Gelistirme S10 31 madde -> 4pt, S11 40 madde -> 4pt).
+//
+// Madde ATILMAZ, punto da zorla buyutulmez (kullanici karari 2026-09-07:
+// "sadece PO'ya uyari"); sadece contentReadability ile PO uyarilir, kisaltma
+// karari onundur.
+export const FS_READABLE_MIN = 7.5;
+
+// Ayni SUTUNDAKI iki kartin puntolari arasinda izin verilen en buyuk oran.
+// 16pt'lik bir kartin yaninda 7.5pt'lik bir kart slaytta garip duruyordu
+// (kullanici istegi 2026-09-07: "sutunda o dengeyi korumak lazim, puntolar
+// birbirinden cok farkli durmamali - bu sunum yoneticiye sunulacak").
+// Buyuk puntolu kart bu orana inene kadar kucultulur, bosalan yer digerine
+// verilir - bkz. fitContent ADIM 4.
+export const FS_SPREAD_MAX = 1.6;
+
 // NOT: MAX_ITEMS_PER_COLUMN (sutun basina 14 madde siniri) KALDIRILDI
 // (kullanici karari 2026-09-07). Madde sayisina gore kirpma yapilmaz; PO'nun
 // yazdigi tum maddeler slayta girer, sigdirma yalnizca yazi boyutuyla olur -
@@ -310,13 +330,57 @@ export function fitContent(d, cardsTop) {
   const columns = {};
   COLUMN_KEYS.forEach(([ust, alt], i) => {
     const butce = avail - G.GAP_Y; // iki kart + aralarindaki bosluk
+    const cift = [ust, alt];
 
-    // Tek basina (sutun ortagi olmadan) butceye bile sigmiyorsa onceden kucult.
-    [ust, alt].forEach((k) => {
-      while (idx[k] < ladder[k].length - 1 && cardH(shown(k), fsOf(k)) > butce) idx[k]++;
+    // ADIM 1 - Her kartin "icerik ihtiyaci": FS_BASE'te kaplayacagi yukseklik.
+    // Bos kart yalnizca basligini ister, dolayisiyla payi da kucuk cikar.
+    const ihtiyac = {};
+    cift.forEach((k) => { ihtiyac[k] = cardH(shown(k), FS_BASE); });
+    const toplamIhtiyac = ihtiyac[ust] + ihtiyac[alt];
+
+    // ADIM 2 - Sutun butcesi ihtiyaca ORANTILI bolunur.
+    //
+    // Eskiden iki kart butcenin TAMAMINI bagimsiz kullaniyor, artan yer de
+    // stretchRowHeights ile ESIT (extra/2) paylastiriliyordu. Sonuc: 13
+    // maddelik "Yapilacak İşler" 7.5pt'de kalirken yanindaki 5 maddelik
+    // "Bekleyen Konular" 16pt'ye buyuyup daha buyuk bir kart kapliyordu
+    // (kullanici bildirimi 2026-09-07: "yapilacak islerde daha cok madde var
+    // ama kart daha kucuk gibi duruyor, cok madde olan kart buyusun ve
+    // puntosu artsin"). Artik cok maddeli kart daha genis bir pay alir.
+    const pay = {};
+    cift.forEach((k) => {
+      pay[k] = toplamIhtiyac > 0 ? butce * (ihtiyac[k] / toplamIhtiyac) : butce / 2;
     });
 
-    // Iki kart butceyi asiyorsa YALNIZCA yazi boyutu kucultulur; her adimda o
+    // ADIM 3 - Her kart KENDI payina sigan en buyuk puntoyu secer.
+    const payaGoreSec = (k, kBrutce) => {
+      idx[k] = 0;
+      while (idx[k] < ladder[k].length - 1 && cardH(shown(k), fsOf(k)) > kBrutce) idx[k]++;
+    };
+    cift.forEach((k) => payaGoreSec(k, pay[k]));
+
+    // ADIM 4 - PUNTO DENGELEME. Ayni sutundaki iki kartin puntosu birbirinden
+    // cok ayrilirsa slayt garip gorunuyor (kullanici istegi 2026-09-07:
+    // "sutunda o dengeyi korumak lazim, puntolar birbirinden cok farkli
+    // durmamali"). Buyuk puntolu kart FS_SPREAD_MAX oranina inene kadar bir
+    // kademe kucultulur; bosalan yukseklik digerine gecer ve o kart
+    // BUYUYEBILIR. Buyuk kart yalnizca kuculur, kucuk kart yalnizca buyur -
+    // guard zaten sonsuz donguyu engeller, sonucta ADIM 5 tasmayi kapatir.
+    // Bos kartlar dengeye girmez (puntolari zaten gorunmuyor).
+    let dengeGuard = 0;
+    while (dengeGuard++ < 40 && shown(ust).length > 0 && shown(alt).length > 0) {
+      const buyukK = fsOf(ust) >= fsOf(alt) ? ust : alt;
+      const kucukK = buyukK === ust ? alt : ust;
+      if (fsOf(buyukK) <= fsOf(kucukK) * FS_SPREAD_MAX) break;
+      if (idx[buyukK] >= ladder[buyukK].length - 1) break;
+      idx[buyukK]++;
+      const kalan = butce - cardH(shown(buyukK), fsOf(buyukK));
+      while (idx[kucukK] > 0 && cardH(shown(kucukK), ladder[kucukK][idx[kucukK] - 1]) <= kalan) {
+        idx[kucukK]--;
+      }
+    }
+
+    // ADIM 5 - Iki kart butceyi asiyorsa YALNIZCA yazi boyutu kucultulur; her adimda o
     // an DAHA UZUN olan kart bir kademe iner. Ikisi de en kucuk puntoya
     // (FS_MIN) geldiyse dongu biter ve TASMAYA IZIN VERILIR - madde ATILMAZ
     // (bkz. fonksiyon basindaki not, kullanici karari 2026-09-07).
@@ -336,8 +400,37 @@ export function fitContent(d, cardsTop) {
       idx[tallerKey]++;
     }
 
+    // ADIM 6 - ARTAN YERI PUNTOYA CEVIR. ADIM 2'deki orantili paylastirma az
+    // maddeli karta kucuk bir pay verir; o kart payina sigmak icin gereginden
+    // fazla kuculmus (orn. 2 maddelik "Riskler" 4pt) ama sutunda hala BOS yer
+    // kalmis olabilir. Burada bos yer bitene kadar EN KUCUK puntolu karttan
+    // baslayarak puntolar birer kademe geri buyutulur - FS_SPREAD_MAX kurali
+    // korunur ve buyutme yalnizca SIGDIGI kadar yapildigi icin tasma olusmaz.
+    let buyutGuard = 0;
+    while (buyutGuard++ < 80) {
+      const kalanYer = butce - (cardH(shown(ust), fsOf(ust)) + cardH(shown(alt), fsOf(alt)));
+      if (kalanYer <= 0.0001) break;
+      const adaylar = cift
+        .filter((k) => shown(k).length > 0 && idx[k] > 0)
+        .sort((a, b) => fsOf(a) - fsOf(b));
+      let buyudu = false;
+      for (const k of adaylar) {
+        const yeniFs = ladder[k][idx[k] - 1];
+        if (cardH(shown(k), yeniFs) - cardH(shown(k), fsOf(k)) > kalanYer) continue;
+        const diger = k === ust ? alt : ust;
+        if (shown(diger).length > 0 && yeniFs > fsOf(diger) * FS_SPREAD_MAX) continue;
+        idx[k]--;
+        buyudu = true;
+        break;
+      }
+      if (!buyudu) break;
+    }
+
+    // Artan yer de ihtiyaca ORANTILI dagitilir (eskiden yariyariya) - cok
+    // maddeli kart hem daha buyuk puntoyu hem de daha uzun bir karti alir.
     const dogal = { ust: cardH(shown(ust), fsOf(ust)), alt: cardH(shown(alt), fsOf(alt)) };
-    const { topH, botH } = stretchRowHeights(dogal.ust, dogal.alt, cardsTop);
+    const ustPayi = toplamIhtiyac > 0 ? ihtiyac[ust] / toplamIhtiyac : 0.5;
+    const { topH, botH } = stretchRowHeights(dogal.ust, dogal.alt, cardsTop, ustPayi);
     columns[i === 0 ? "left" : "right"] = { topH, botH, yBot: cardsTop + topH + G.GAP_Y };
   });
 
@@ -383,12 +476,16 @@ export function extractPriority(t) {
  * onizleme (SlideCanvas) ve PPTX (sprintDeckBuilder) AYNI fonksiyonu kullanir,
  * ikisi de senkron kalir.
  */
-export function stretchRowHeights(topH, botH, cardsTop) {
+export function stretchRowHeights(topH, botH, cardsTop, ustPayi = 0.5) {
   const avail = G.Y_BOT - cardsTop;
   const extra = avail - (topH + G.GAP_Y + botH);
   if (extra <= 0) return { topH, botH };
-  const add = extra / 2;
-  return { topH: topH + add, botH: botH + add };
+  // ustPayi: artan yerin ust karta dusen orani. Varsayilan 0.5 (eski
+  // yariyariya davranis, disaridan cagiran olursa bozulmasin); fitContent
+  // icerik ihtiyacina gore hesaplanmis orani gecirir (kullanici istegi
+  // 2026-09-07: cok maddeli kart daha uzun olsun).
+  const oran = Math.min(1, Math.max(0, ustPayi));
+  return { topH: topH + extra * oran, botH: botH + extra * (1 - oran) };
 }
 
 /** "**metin**" isaretlemesini kalin run'lara ayirir. SlideCanvas ve sprintDeckBuilder ayni sekilde tuketir. */
@@ -405,4 +502,33 @@ export function parseRuns(t) {
 /** Bir bolumdeki (done/active/...) maddelerden herhangi biri ##Öncelik## isaretleyicisi iceriyor mu? */
 export function hasPriorityTags(data) {
   return SECTION_KEYS.some((k) => (data[k] || []).some((t) => /##(.+?)##/.test(String(t))));
+}
+
+/**
+ * Icerik slaytindaki en kucuk punto FS_READABLE_MIN'in altina dustuyse
+ * PO'yu uyarmak icin gereken bilgiyi dondurur, aksi halde null. Slayti
+ * DEGISTIRMEZ - madde kirpmaz, punto zorlamaz (bkz. FS_READABLE_MIN).
+ *
+ * `d` SlideCanvas/sprintDeckBuilder'a verilen sprintData ile ayni bicimde
+ * olmali: { done, active, risk, pending: string[], showBand, targets }.
+ */
+export function contentReadability(d) {
+  if (!d) return null;
+  // Bolum dizileri eksik/tanimsiz olabilir (orn. yeni sunum) - fitContent
+  // yayilma operatoru kullandigi icin once guvenli bir kopya kurulur.
+  const safe = { ...d };
+  SECTION_KEYS.forEach((k) => { safe[k] = Array.isArray(d[k]) ? d[k] : []; });
+  const dolu = SECTION_KEYS.filter((k) => safe[k].length > 0);
+  if (dolu.length === 0) return null;
+
+  const { fsByKey } = fitContent(safe, cardsTopFor(safe));
+  const fs = Math.min(...dolu.map((k) => fsByKey[k]));
+  if (fs >= FS_READABLE_MIN) return null;
+
+  return {
+    fs,
+    itemCount: dolu.reduce((toplam, k) => toplam + safe[k].length, 0),
+    // 5pt ve altinda yazi ekranda ~2 piksel kaliyor, kart tamamen BOS gorunuyor.
+    critical: fs <= 5,
+  };
 }

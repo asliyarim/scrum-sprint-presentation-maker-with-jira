@@ -30,6 +30,7 @@ import WizardSteps from "./components/shared/WizardSteps";
 import UnifiedPreviewPane from "./components/shared/UnifiedPreviewPane";
 import Button from "./components/shared/Button";
 import AlertModal from "./components/shared/AlertModal";
+import Modal from "./components/shared/Modal";
 import ReadOnlyNotice from "./components/shared/ReadOnlyNotice";
 
 import SprintPage from "./components/sprint/SprintPage";
@@ -60,7 +61,7 @@ import { useCoverBackground } from "./hooks/useCoverBackground";
 import { useVelocityBurndown } from "./hooks/useVelocityBurndown";
 import { useSectorOptions } from "./hooks/useSectorOptions";
 
-import { sectionDefs, SECTION_KEYS } from "./lib/geometry";
+import { sectionDefs, SECTION_KEYS, contentReadability } from "./lib/geometry";
 import { buildFullDeck } from "./lib/fullDeckBuilder";
 import { ASSETS } from "./assets/pptxAssets";
 import { hasFteTracking, resolveIsAdmin, resolveTeamTypeFromDepartment } from "./lib/teamTypes";
@@ -391,6 +392,9 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   // Ust uste hizli takim degistirildiginde geciken yanitin guncel secimi
   // ezmemesi icin istek sayaci (yalnizca en son istek uygulanir).
   const readOnlyReqRef = useRef(0);
+  // /editor/:id acilisinda KAYITLI olan icerik bolumleri - "dolu sunumun
+  // uzerine bos kaydediliyor" durumunu yakalamak icin (bkz. kaydetmeUyarilari).
+  const yuklenenIcerikRef = useRef(null);
   // fetchTeams sonucu (teamType -> takim id eslemesi) tek sefer cekilir.
   const teamsPromiseRef = useRef(null);
   const band = useBandEditor();
@@ -506,6 +510,9 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   const [presentationMeta, setPresentationMeta] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [saveStatus, setSaveStatus] = useState({ loading: false, error: null });
+  // Kaydetmeden once onay istenen riskler (bkz. kaydetmeUyarilari). null =
+  // sorulacak bir sey yok, kayit dogrudan yapilir.
+  const [saveConfirm, setSaveConfirm] = useState(null);
   // Kapakta secili Takım Tipi'ne karsilik gelen takim (teams listesi ile
   // TEAM_TYPES 1-1 eslesir, bkz. V13__seed_teams.sql).
   const teamIdForSelectedType = useMemo(
@@ -746,11 +753,18 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   // izin kapasiteden dusulmeye devam eder.
 
   useEffect(() => {
-    if (!presentationId) return;
+    if (!presentationId) {
+      yuklenenIcerikRef.current = null; // yeni sunum - kiyaslanacak eski icerik yok
+      return;
+    }
     setLoadError(null);
     fetchPresentation(presentationId)
       .then((p) => {
         applyContent(p.content || {});
+        // Acilista KAYITLI olan icerik saklanir: dolu bir sunumun uzerine bos
+        // kaydedilmek uzereyse PO uyarilir (bkz. kaydetmeUyarilari). Sadece
+        // kiyaslama icin tutulur, forma etkisi yoktur.
+        yuklenenIcerikRef.current = p.content?.sections || null;
         setPresentationMeta({ id: p.id, teamId: p.teamId, sprintNo: p.sprintNo, currentVersion: p.currentVersion });
       })
       .catch((err) => setLoadError(err?.message || "Sunum yüklenemedi."));
@@ -951,8 +965,71 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
     return true;
   };
 
+  /**
+   * Kaydetmeden ONCE kullaniciya sorulacak riskler. Hicbirini ENGELLEMEZ,
+   * yalnizca onay ister - Gozde'nin Sprint 10/11 sunumlarinin icerik
+   * kartlarinin bos bir surumle ezilmesi uzerine eklendi (kullanici
+   * bildirimi 2026-09-07). Liste bos donerse kayit dogrudan yapilir,
+   * yani eskisi gibi calisir.
+   */
+  const kaydetmeUyarilari = async () => {
+    const uyarilar = [];
+
+    // 1) DOLU bir sunumun uzerine BOS icerik kaydediliyor mu?
+    //    Not: "icerik bos" tek basina uyari sebebi DEGIL - kayitli sunumlarin
+    //    yarisi (33'te 14) zaten bos icerikle duruyor, sadece kapasite
+    //    dashboard'u icin kullaniliyor; her kayitta uyari cikmasi PO'yu
+    //    bogardi. Yalnizca ACILISTA DOLU olan icerik bosalmissa uyarilir.
+    const bosIcerik = SECTION_KEYS.every((k) => !String(sprintForm.sections[k] || "").trim());
+    const acilistaDoluydu =
+      !!yuklenenIcerikRef.current &&
+      SECTION_KEYS.some((k) => String(yuklenenIcerikRef.current[k] || "").trim());
+    if (bosIcerik && acilistaDoluydu) {
+      uyarilar.push(
+        "Bu sunum açılırken içerik kartları DOLUYDU, şu an dördü de boş " +
+          "(Tamamlanan İşler, Yapılacak İşler, Riskler, Bekleyen Konular). " +
+          "Kaydedersen içerik slaytı boş bir sürümle güncellenir."
+      );
+    }
+
+    // 2) "+ Yeni Sunum" akisinda ayni sprint no zaten kayitli mi?
+    //    Backend id=null geldiginde ayni (takim, sprint) kaydini bulup
+    //    UZERINE sessizce yeni bir surum yaziyor (bkz.
+    //    PresentationService.upsert - id!=null yolunda 409 korumasi VAR,
+    //    id==null yolunda YOK). Kullaniciya burada haber verilir.
+    if (!aktifSunum && saveTeamId && sprintForm.sprint.trim()) {
+      try {
+        const mevcut = await fetchPresentations(saveTeamId);
+        const ayni = (mevcut || []).find(
+          (p) => String(p.sprintNo).trim() === sprintForm.sprint.trim()
+        );
+        if (ayni) {
+          uyarilar.push(
+            `Bu takımda "Sprint ${ayni.sprintNo}" zaten kayıtlı (şu an v${ayni.currentVersion}). ` +
+              "Kaydedersen o sunumun ÜZERİNE yeni bir sürüm yazılır."
+          );
+        }
+      } catch {
+        // Liste alinamadiysa uyari uretemeyiz - kaydetmeyi ENGELLEMEYIZ,
+        // davranis eskisiyle ayni kalir.
+      }
+    }
+
+    return uyarilar;
+  };
+
   const handleSave = async () => {
     if (!validateBeforeSave()) return;
+    const uyarilar = await kaydetmeUyarilari();
+    if (uyarilar.length > 0) {
+      setSaveConfirm(uyarilar);
+      return;
+    }
+    await kaydetmeyiYap();
+  };
+
+  const kaydetmeyiYap = async () => {
+    setSaveConfirm(null);
     setSaveStatus({ loading: true, error: null });
     try {
       const saved = await savePresentation({
@@ -1084,6 +1161,10 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   };
 
   const sprintData = { ...sprintForm.data, showBand: band.show, targets: band.bars };
+  // Madde sayisi arttikca yazi kuculur (madde siniri yok, bkz. geometry).
+  // Okunamayacak kadar kucuk kaldiysa PO'ya icerik adiminda uyari gosterilir -
+  // slayta MUDAHALE EDILMEZ, kisaltma karari PO'nundur.
+  const okunabilirlik = contentReadability(sprintData);
   // PPTX ciktisinin "orantı motoru" gorselin GERCEK piksel boyutuna ihtiyac
   // duyar (bkz. lib/velocityDeckBuilder.js - pptxgenjs'in sizing:contain
   // ozelligi bunu KENDISI okuyamiyor), canli onizleme ise buna hic ihtiyac
@@ -1250,6 +1331,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
                 assets={assets}
                 onExpandSection={setEditorKey}
                 sectorOptions={sectorOptions}
+                readability={okunabilirlik}
               />
             ) : (
               <ReadOnlyNotice teamType={sprintForm.teamType} view={readOnlyView} />
@@ -1365,6 +1447,30 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
         message={wizardAlert}
         onClose={() => setWizardAlert(null)}
       />
+
+      {/* Kaydetmeden once veri kaybi riski varsa onay - bkz.
+          kaydetmeUyarilari. Risk yoksa bu modal HIC acilmaz, kaydetme
+          akisi eskisi gibi tek tikta biter. */}
+      <Modal open={!!saveConfirm} onClose={() => (saveStatus.loading ? null : setSaveConfirm(null))}>
+        <h3 style={{ marginTop: 0 }}>Kaydetmeden önce</h3>
+        <ul style={{ color: "var(--mut)", lineHeight: 1.6, paddingLeft: 20, margin: "10px 0" }}>
+          {(saveConfirm || []).map((u, i) => (
+            <li key={i} style={{ marginBottom: 6 }}>{u}</li>
+          ))}
+        </ul>
+        <p style={{ color: "var(--mut)", lineHeight: 1.6, marginBottom: 0 }}>
+          Eski sürümler <b>silinmez</b>; yanlışlıkla kaydedersen sunumun <b>Sürüm Geçmişi</b>'nden
+          önceki sürüme geri dönebilirsin.
+        </p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
+          <Button variant="soft" onClick={() => setSaveConfirm(null)} disabled={saveStatus.loading}>
+            Vazgeç
+          </Button>
+          <Button variant="primary" onClick={kaydetmeyiYap} loading={saveStatus.loading} loadingLabel="Kaydediliyor…">
+            Yine de kaydet
+          </Button>
+        </div>
+      </Modal>
     </>
   );
 }
