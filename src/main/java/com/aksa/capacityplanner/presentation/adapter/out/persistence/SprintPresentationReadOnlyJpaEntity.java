@@ -12,6 +12,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -56,4 +57,16 @@ public class SprintPresentationReadOnlyJpaEntity {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @Column(name = "finalized_at")
+    private Instant finalizedAt;
+
+    @Column(name = "finalized_by")
+    private String finalizedBy;
+
+    @Column(name = "period_start")
+    private LocalDate periodStart;
+
+    @Column(name = "period_end")
+    private LocalDate periodEnd;
 }

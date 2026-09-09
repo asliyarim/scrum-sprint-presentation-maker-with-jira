@@ -9,4 +9,7 @@ public interface SprintPresentationJpaRepository extends JpaRepository<SprintPre
     Optional<SprintPresentationJpaEntity> findByTeamIdAndSprintNo(Long teamId, String sprintNo);
 
     List<SprintPresentationJpaEntity> findByTeamId(Long teamId);
+
+    /** Donem tarihi henuz doldurulmamis kayitlar - bkz. PresentationPeriodBackfill. */
+    List<SprintPresentationJpaEntity> findByPeriodStartIsNull();
 }

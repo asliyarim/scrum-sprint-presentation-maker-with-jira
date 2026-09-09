@@ -88,6 +88,18 @@ public class PresentationFacade {
         return presentationUseCase.recordDownload(downloadType, teamIds, downloadedBy);
     }
 
+    /**
+     * "Sunumum hazir" isareti - ortak sunumun tetiklenmesi icin (bkz.
+     * V33__presentation_finalized.sql). Yetki kurali duzenlemeyle AYNI: PO
+     * kendi takiminin sunumunu isaretler, admin hepsini.
+     */
+    public SprintPresentation setFinalized(Long presentationId, boolean finalized, String callerSicil,
+                                            List<Long> callerTeamIds, boolean callerIsAdmin) {
+        SprintPresentation presentation = presentationUseCase.getById(presentationId);
+        requireEditAccess(presentation.getTeamId(), callerTeamIds, callerIsAdmin);
+        return presentationUseCase.setFinalized(presentationId, finalized, callerSicil);
+    }
+
     private void requireEditAccess(Long targetTeamId, List<Long> callerTeamIds, boolean callerIsAdmin) {
         if (callerIsAdmin) {
             return;

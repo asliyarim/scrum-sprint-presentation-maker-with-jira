@@ -55,6 +55,12 @@ public interface PresentationUseCase {
      */
     SprintPresentation rollback(Long presentationId, int version, String updatedBySicil);
 
+    /**
+     * Sunumu "hazir" olarak isaretler ya da isareti geri alir. Isaret
+     * REVIZYONDA DUSMEZ; yalnizca burada acikca geri alinir.
+     */
+    SprintPresentation setFinalized(Long presentationId, boolean finalized, String callerSicil);
+
     /** Ortak (coklu takim) sunum ozelligi: her takimin en son sunumunu dondurur - bkz. PresentationRepositoryPort. */
     List<SprintPresentation> listLatestPerTeamReadOnly(List<Long> teamIds);
 

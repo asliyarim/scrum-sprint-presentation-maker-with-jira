@@ -77,7 +77,7 @@ class ReportedDeltaTest {
         content.put("dashData", dash);
 
         SprintPresentation p = new SprintPresentation(1L, 2L, "4", "24 Temmuz – 6 Ağustos", content, 11, "30816",
-                Instant.parse("2026-08-27T14:01:09Z"), Instant.parse("2026-08-27T14:01:09Z"));
+                Instant.parse("2026-08-27T14:01:09Z"), Instant.parse("2026-08-27T14:01:09Z"), null, null, null, null);
         TeamCapacitySnapshotDto dto = CapacitySnapshotMapper.toSnapshot(TEAM, p, List.of());
         return dto.totals();
     }

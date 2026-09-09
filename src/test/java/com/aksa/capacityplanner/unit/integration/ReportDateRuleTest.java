@@ -77,6 +77,6 @@ class ReportDateRuleTest {
 
     private static SprintPresentation presentation(Map<String, Object> content) {
         return new SprintPresentation(1L, 1L, "18", "24.08.2026 – 07.09.2026", content, 1, "40538",
-                Instant.parse("2026-09-01T10:00:00Z"), Instant.parse("2026-09-04T11:34:00Z"));
+                Instant.parse("2026-09-01T10:00:00Z"), Instant.parse("2026-09-04T11:34:00Z"), null, null, null, null);
     }
 }

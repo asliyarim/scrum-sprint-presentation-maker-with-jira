@@ -105,6 +105,27 @@ public class PresentationController {
         return toDetailDto(saved);
     }
 
+    /**
+     * "Sunumum hazir" isareti. Ortak sunum, bir donemdeki tum ekipler bu
+     * isareti koyunca olusur (bkz. V33__presentation_finalized.sql).
+     * Isaret revizyonda DUSMEZ; geri almak icin ayni yola DELETE atilir.
+     */
+    @PostMapping("/{id}/finalize")
+    public PresentationDetailDto finalizePresentation(@PathVariable Long id, Authentication authentication) {
+        JwtTokenProvider.AccessTokenClaims claims = requireClaims(authentication);
+        SprintPresentation saved = presentationFacade.setFinalized(id, true, claims.sicil(), claims.teamIds(),
+                claims.role() == Role.ADMIN);
+        return toDetailDto(saved);
+    }
+
+    @DeleteMapping("/{id}/finalize")
+    public PresentationDetailDto unfinalizePresentation(@PathVariable Long id, Authentication authentication) {
+        JwtTokenProvider.AccessTokenClaims claims = requireClaims(authentication);
+        SprintPresentation saved = presentationFacade.setFinalized(id, false, claims.sicil(), claims.teamIds(),
+                claims.role() == Role.ADMIN);
+        return toDetailDto(saved);
+    }
+
     private JwtTokenProvider.AccessTokenClaims requireClaims(Authentication authentication) {
         if (authentication == null || !(authentication.getDetails() instanceof JwtTokenProvider.AccessTokenClaims claims)) {
             throw new AccessDeniedException("Oturum bulunamadi.");
@@ -114,12 +135,16 @@ public class PresentationController {
 
     private PresentationSummaryDto toSummaryDto(SprintPresentation p) {
         return new PresentationSummaryDto(p.getId(), p.getTeamId(), p.getSprintNo(), p.getDateRange(),
-                p.getCurrentVersion(), p.getUpdatedBy(), p.getUpdatedAt());
+                p.getCurrentVersion(), p.getUpdatedBy(), p.getUpdatedAt(),
+                p.getFinalizedAt(), p.getFinalizedBy(),
+                p.getPeriodStart(), p.getPeriodEnd());
     }
 
     private PresentationDetailDto toDetailDto(SprintPresentation p) {
         return new PresentationDetailDto(p.getId(), p.getTeamId(), p.getSprintNo(), p.getDateRange(),
-                p.getContent(), p.getCurrentVersion(), p.getUpdatedBy(), p.getUpdatedAt());
+                p.getContent(), p.getCurrentVersion(), p.getUpdatedBy(), p.getUpdatedAt(),
+                p.getFinalizedAt(), p.getFinalizedBy(),
+                p.getPeriodStart(), p.getPeriodEnd());
     }
 
     private PresentationVersionDto toVersionDto(PresentationVersion v) {

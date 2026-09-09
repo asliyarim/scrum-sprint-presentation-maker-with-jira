@@ -150,7 +150,7 @@ class CapacitySnapshotMapperTest {
 
     private static SprintPresentation presentation(Map<String, Object> content) {
         return new SprintPresentation(31L, 2L, "5", "07.08.2026 – 03.09.2026", content, 3, "35840",
-                Instant.parse("2026-09-01T10:00:00Z"), Instant.parse("2026-09-03T14:24:00Z"));
+                Instant.parse("2026-09-01T10:00:00Z"), Instant.parse("2026-09-03T14:24:00Z"), null, null, null, null);
     }
 
     private static Map<String, Object> dashData(Map<String, Object> kpis, List<Map<String, Object>> persons,

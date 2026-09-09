@@ -5,6 +5,7 @@ import com.aksa.capacityplanner.common.domain.NotFoundException;
 import com.aksa.capacityplanner.presentation.domain.PresentationDownloadLog;
 import com.aksa.capacityplanner.presentation.domain.PresentationVersion;
 import com.aksa.capacityplanner.presentation.domain.SprintPresentation;
+import com.aksa.capacityplanner.presentation.domain.SprintPeriodParser;
 import com.aksa.capacityplanner.presentation.port.in.PresentationUseCase;
 import com.aksa.capacityplanner.presentation.port.out.PresentationDownloadLogRepositoryPort;
 import com.aksa.capacityplanner.presentation.port.out.PresentationRepositoryPort;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +24,9 @@ public class PresentationService implements PresentationUseCase {
 
     private final PresentationRepositoryPort presentationRepository;
     private final PresentationVersionRepositoryPort versionRepository;
+    /** Donem tarihlerinin yil tahmininde kullanilan saat dilimi. */
+    private static final ZoneId ISTANBUL = ZoneId.of("Europe/Istanbul");
+
     private final PresentationDownloadLogRepositoryPort downloadLogRepository;
 
     public PresentationService(PresentationRepositoryPort presentationRepository,
@@ -99,11 +105,39 @@ public class PresentationService implements PresentationUseCase {
         presentation.setContent(content);
         presentation.setUpdatedBy(updatedBySicil);
         presentation.setCurrentVersion(nextVersion);
+        donemTarihleriniTuret(presentation);
         SprintPresentation saved = presentationRepository.save(presentation);
 
         versionRepository.save(new PresentationVersion(null, saved.getId(), nextVersion,
                 content, updatedBySicil, Instant.now()));
         return saved;
+    }
+
+    /**
+     * date_range metninden donem tarihlerini turetip kayda yazar.
+     *
+     * Neden metinden turetiyoruz da ayri bir alan olarak ISTEMIYORUZ: date_range
+     * zaten slaytta/PPTX'te gorunen tek kaynak. Takvimden secim yapildiginda
+     * arayuz bu metni kesin bir bicimde ("dd.MM.yyyy – dd.MM.yyyy") uretiyor,
+     * yani ayristirma belirsiz degil. Boylece API sozlesmesi hic degismiyor ve
+     * eski istemciler de calismaya devam ediyor.
+     *
+     * Cevrilemezse alanlar NULL kalir - sunum yine kaydedilir, sadece otomatik
+     * donem eslestirmesine giremez.
+     */
+    private void donemTarihleriniTuret(SprintPresentation presentation) {
+        LocalDate referans = presentation.getCreatedAt() != null
+                ? LocalDate.ofInstant(presentation.getCreatedAt(), ISTANBUL)
+                : LocalDate.now(ISTANBUL);
+        SprintPeriodParser.parse(presentation.getDateRange(), referans).ifPresentOrElse(
+                donem -> {
+                    presentation.setPeriodStart(donem.start());
+                    presentation.setPeriodEnd(donem.end());
+                },
+                () -> {
+                    presentation.setPeriodStart(null);
+                    presentation.setPeriodEnd(null);
+                });
     }
 
     private int nextVersionNumber(Long presentationId) {
@@ -118,6 +152,7 @@ public class PresentationService implements PresentationUseCase {
         presentation.setDateRange(dateRange);
         presentation.setContent(content);
         presentation.setUpdatedBy(updatedBySicil);
+        donemTarihleriniTuret(presentation);
         SprintPresentation saved = presentationRepository.save(presentation);
 
         // currentVersion'a karsilik gelen versions kaydini da senkron tutar -
@@ -164,6 +199,28 @@ public class PresentationService implements PresentationUseCase {
         presentation.setContent(target.getContent());
         presentation.setCurrentVersion(version);
         presentation.setUpdatedBy(updatedBySicil);
+        return presentationRepository.save(presentation);
+    }
+
+    /**
+     * Sunumu "hazir" isaretler / isareti geri alir.
+     *
+     * Yeni bir SURUM OLUSTURMAZ: bu bir icerik degisikligi degil, bir durum
+     * degisikligi. Aksi halde her hazir/geri al tiklamasi surum gecmisini
+     * sisirir ve Cagdas Bey'in bakacagi surum listesi anlamsizlasirdi.
+     *
+     * Zaten ayni durumdaysa hicbir sey yazilmaz - gereksiz updated_at
+     * degisikligi olmasin diye (liste "en son guncelleyen" bilgisini gosteriyor).
+     */
+    @Override
+    @Transactional
+    public SprintPresentation setFinalized(Long presentationId, boolean finalized, String callerSicil) {
+        SprintPresentation presentation = getById(presentationId);
+        if (presentation.isFinalized() == finalized) {
+            return presentation;
+        }
+        presentation.setFinalizedAt(finalized ? Instant.now() : null);
+        presentation.setFinalizedBy(finalized ? callerSicil : null);
         return presentationRepository.save(presentation);
     }
 

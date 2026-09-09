@@ -90,7 +90,9 @@ public class PresentationPersistenceAdapter implements PresentationRepositoryPor
     private SprintPresentation toDomain(SprintPresentationReadOnlyJpaEntity entity) {
         return new SprintPresentation(entity.getId(), entity.getTeamId(), entity.getSprintNo(), entity.getDateRange(),
                 entity.getContent(), entity.getCurrentVersion(), entity.getUpdatedBy(),
-                entity.getCreatedAt(), entity.getUpdatedAt());
+                entity.getCreatedAt(), entity.getUpdatedAt(),
+                entity.getFinalizedAt(), entity.getFinalizedBy(),
+                entity.getPeriodStart(), entity.getPeriodEnd());
     }
 
     private SprintPresentationJpaEntity toEntity(SprintPresentation presentation) {
@@ -102,12 +104,23 @@ public class PresentationPersistenceAdapter implements PresentationRepositoryPor
         entity.setContent(presentation.getContent());
         entity.setCurrentVersion(presentation.getCurrentVersion());
         entity.setUpdatedBy(presentation.getUpdatedBy());
+        // KRITIK: bu metot her kayitta SIFIRDAN bir entity kurup merge ediyor.
+        // "Hazir" isareti burada eslenmezse, PO sunumu her kaydettiginde isaret
+        // sessizce NULL'a doner ve ortak sunum bir daha hic tetiklenmezdi.
+        entity.setFinalizedAt(presentation.getFinalizedAt());
+        entity.setFinalizedBy(presentation.getFinalizedBy());
+        // toEntity sifirdan kurup merge ettigi icin bunlar da eslenmek ZORUNDA
+        // (bkz. yukaridaki finalized uyarisi) - yoksa her kayitta silinirlerdi.
+        entity.setPeriodStart(presentation.getPeriodStart());
+        entity.setPeriodEnd(presentation.getPeriodEnd());
         return entity;
     }
 
     private SprintPresentation toDomain(SprintPresentationJpaEntity entity) {
         return new SprintPresentation(entity.getId(), entity.getTeamId(), entity.getSprintNo(), entity.getDateRange(),
                 entity.getContent(), entity.getCurrentVersion(), entity.getUpdatedBy(),
-                entity.getCreatedAt(), entity.getUpdatedAt());
+                entity.getCreatedAt(), entity.getUpdatedAt(),
+                entity.getFinalizedAt(), entity.getFinalizedBy(),
+                entity.getPeriodStart(), entity.getPeriodEnd());
     }
 }

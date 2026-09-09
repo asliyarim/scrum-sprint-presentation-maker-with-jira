@@ -10,6 +10,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -52,4 +53,25 @@ public class SprintPresentationJpaEntity {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    /**
+     * PO sunumu "hazir" olarak isaretledigi an; NULL ise henuz hazir degil.
+     * Revizyonda DUSMEZ - bkz. V33__presentation_finalized.sql.
+     *
+     * DIKKAT: PresentationPersistenceAdapter.toEntity her kayitta SIFIRDAN bir
+     * entity kurup merge ettigi icin bu alan orada da eslenmek ZORUNDA; aksi
+     * halde her "Kaydet" isareti sessizce silerdi.
+     */
+    @Column(name = "finalized_at")
+    private Instant finalizedAt;
+
+    @Column(name = "finalized_by")
+    private String finalizedBy;
+
+    /** Sprint donemi - date_range metninden turetilir/takvimden secilir (V34). */
+    @Column(name = "period_start")
+    private LocalDate periodStart;
+
+    @Column(name = "period_end")
+    private LocalDate periodEnd;
 }
