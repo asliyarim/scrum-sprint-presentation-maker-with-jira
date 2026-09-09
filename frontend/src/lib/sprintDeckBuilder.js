@@ -131,12 +131,15 @@ export function addContentSlide(pptx, data, assets, theme = "light", cornerMesh 
   }
 
   const CARDS_TOP = drawBand();
-  const { sections, fsByKey, columns } = fitContent(data, CARDS_TOP);
+  const { sections, fsByKey, columns, ekAralik } = fitContent(data, CARDS_TOP);
   // Her sutun kendi dikey bolunmesini kullanir (bkz. geometry.fitContent) -
   // onizlemedeki SlideCanvas ile BIREBIR ayni.
   const sol = columns.left, sag = columns.right;
 
-  function drawCard(x, y, items, sec, fs2, h) {
+  // ek: sutunda artan payin madde BASINA dusen kismi (inc) - onizlemedeki
+  // --item-extra-gap ile AYNI deger (bkz. geometry.js ADIM 7). 0 iken
+  // paraSpaceAfter eskisiyle birebir ayni kalir.
+  function drawCard(x, y, items, sec, fs2, h, ek = 0) {
     s2.addShape(pptx.ShapeType.roundRect, { x, y, w: G.COL_W, h, rectRadius: 0.06, fill: { color: P.CARD_BG }, line: { color: P.CARD_LINE, width: 1 }, shadow: { type: "outer", color: "9CA3AF", blur: 6, offset: 2, angle: 90, opacity: 0.28 } });
     // Onizlemedeki (.card-watermark, bkz. theme.css) kosede buyuk soluk filigran
     // ikon - onceden SADECE canli onizlemede vardi ("bu CSS'i pptx hic gormez"
@@ -195,7 +198,7 @@ export function addContentSlide(pptx, data, assets, theme = "light", cornerMesh 
           // ALT SATIRA duserdi (bkz. kullanici bildirimi: "bold yazılar
           // aşağı satıra kayıyor").
           mainRuns[0].options = Object.assign({}, mainRuns[0].options, {
-            paraSpaceAfter: gapAt(fs2) * 72,
+            paraSpaceAfter: (gapAt(fs2) + ek) * 72,
           });
           const isLastItem = i === items.length - 1;
           if (comment) {
@@ -217,7 +220,7 @@ export function addContentSlide(pptx, data, assets, theme = "light", cornerMesh 
                 ...(P.CMT_BG ? { highlight: P.CMT_BG } : {}),
                 fontSize: fs2 * 0.84,
                 breakLine: !isLastItem,
-                paraSpaceAfter: gapAt(fs2) * 72,
+                paraSpaceAfter: (gapAt(fs2) + ek) * 72,
               },
             });
           } else {
@@ -257,10 +260,10 @@ export function addContentSlide(pptx, data, assets, theme = "light", cornerMesh 
     });
   }
 
-  drawCard(G.X_L, CARDS_TOP, sections.done, SEC.done, fsByKey.done, sol.topH);
-  drawCard(G.X_L, sol.yBot, sections.risk, SEC.risk, fsByKey.risk, sol.botH);
-  drawCard(G.X_R, CARDS_TOP, sections.active, SEC.active, fsByKey.active, sag.topH);
-  drawCard(G.X_R, sag.yBot, sections.pending, SEC.pending, fsByKey.pending, sag.botH);
+  drawCard(G.X_L, CARDS_TOP, sections.done, SEC.done, fsByKey.done, sol.topH, ekAralik.done);
+  drawCard(G.X_L, sol.yBot, sections.risk, SEC.risk, fsByKey.risk, sol.botH, ekAralik.risk);
+  drawCard(G.X_R, CARDS_TOP, sections.active, SEC.active, fsByKey.active, sag.topH, ekAralik.active);
+  drawCard(G.X_R, sag.yBot, sections.pending, SEC.pending, fsByKey.pending, sag.botH, ekAralik.pending);
 
   return s2;
 }

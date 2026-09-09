@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
  * 5 dk ise `totalSeconds` değişmez; resetKey olarak takım sırası verilir).
  * Verilmezse davranış değişmez.
  */
-export function useCountdown(totalSeconds, active, onExpire, resetKey) {
+export function useCountdown(totalSeconds, active, onExpire, resetKey, paused = false) {
   const [remaining, setRemaining] = useState(totalSeconds ?? 0);
   const onExpireRef = useRef(onExpire);
   onExpireRef.current = onExpire;
@@ -22,8 +22,13 @@ export function useCountdown(totalSeconds, active, onExpire, resetKey) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalSeconds, active, resetKey]);
 
+  // `paused`: sayaci DURDURUR ama kalan sureyi KORUR (kullanici istegi
+  // 2026-09-08, Gözde: "sunumda sure durdur/baslat yapabilir miyiz?").
+  // `active`den farki bu: active degisince sure bastan baslar, paused
+  // degisince kaldigi yerden devam eder. Bagimli dizide YER ALMAZ, cunku
+  // yukaridaki sifirlama efektine girerse duraklat/devam et sureyi sifirlar.
   useEffect(() => {
-    if (!active || !totalSeconds || totalSeconds <= 0) return undefined;
+    if (!active || paused || !totalSeconds || totalSeconds <= 0) return undefined;
     const id = setInterval(() => {
       setRemaining((r) => {
         if (r <= 1) {
@@ -38,7 +43,7 @@ export function useCountdown(totalSeconds, active, onExpire, resetKey) {
     // resetKey: sure dolunca interval icerideki clearInterval ile duruyor -
     // ayni sureli bir sonraki takima gecilince yeniden kurulmasi icin gerekli.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, totalSeconds, resetKey]);
+  }, [active, paused, totalSeconds, resetKey]);
 
   return remaining;
 }

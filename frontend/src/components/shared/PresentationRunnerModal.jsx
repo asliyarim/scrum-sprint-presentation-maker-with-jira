@@ -126,7 +126,13 @@ export default function PresentationRunnerModal({ open, onClose, queue, assets }
   // teamIndex reset anahtari olarak veriliyor: ard arda gelen iki takimin
   // suresi AYNI ise (orn. ikisi de 5 dk) totalSeconds degismedigi icin sayac
   // kendiliginden sifirlanmazdi - takim degisiminde her zaman bastan baslar.
-  const remaining = useCountdown(currentSeconds, active, advanceTeam, teamIndex);
+  // Sunum sirasinda sayaci duraklatip devam ettirebilme (kullanici istegi
+  // 2026-09-08, Gözde: "sunumda sure durdur/baslat yapabilir miyiz?").
+  // Duraklatma slayt/takim degisiminde OTOMATIK kalkar - yeni takimin suresi
+  // durdurulmus baslamasin diye (bkz. asagidaki efekt).
+  const [paused, setPaused] = useState(false);
+  useEffect(() => { setPaused(false); }, [teamIndex, open]);
+  const remaining = useCountdown(currentSeconds, active, advanceTeam, teamIndex, paused);
   const isCoverSlide = currentSlide?.kind === "cover";
   const critical = active && !isCoverSlide && remaining <= 15;
 
@@ -188,7 +194,20 @@ export default function PresentationRunnerModal({ open, onClose, queue, assets }
           ) : (
             <>
               <span className="presentation-runner-team">{current?.teamName}</span>
-              {!isCoverSlide && <span className="timer-badge">{formatMmSs(remaining)}</span>}
+              {!isCoverSlide && (
+                <>
+                  <span className={`timer-badge${paused ? " timer-paused" : ""}`}>{formatMmSs(remaining)}</span>
+                  <button
+                    type="button"
+                    className="tab"
+                    title={paused ? "Süreyi devam ettir" : "Süreyi durdur"}
+                    aria-label={paused ? "Süreyi devam ettir" : "Süreyi durdur"}
+                    onClick={() => setPaused((p) => !p)}
+                  >
+                    {paused ? "▶ Devam" : "⏸ Durdur"}
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>

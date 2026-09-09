@@ -19,6 +19,23 @@ export function hasFteTracking(teamType) {
   return TEAM_TYPES.find((t) => t.value === teamType)?.hasFte ?? false;
 }
 
+/**
+ * Excel yuklendiginde Hedefler bandi OTOMATIK acilsin mi? Eskiden takim
+ * ayrimi yoktu: Excel'in "Rapor" sayfasinda bant verisi bulunan HER takimda
+ * bant kendiliginden aciliyor, digerleri de elle kapatmak zorunda kaliyordu
+ * (kullanici bildirimi 2026-09-08, Gözde: "hedef bari tum ekiplere default
+ * geliyor sanirim, manuel tekrar kaldirmak gerekiyor - bunu sadece RPA ve
+ * is zekasina default yapabilirsin").
+ *
+ * Bu YALNIZCA otomatik acilmayi kapatir; bant editoru ve elle acma anahtari
+ * her takimda durmaya devam eder, yani kimseden bir ozellik eksilmez.
+ */
+export const BAND_AUTO_TEAM_TYPES = ["RPA", "IS_ZEKASI"];
+
+export function bandAutoFills(teamType) {
+  return BAND_AUTO_TEAM_TYPES.includes(teamType);
+}
+
 export function teamTypeLabel(teamType) {
   return TEAM_TYPES.find((t) => t.value === teamType)?.label ?? "";
 }

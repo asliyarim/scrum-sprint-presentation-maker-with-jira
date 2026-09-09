@@ -100,7 +100,10 @@
      satir sayisini karakter/satir oranindan tahmin ediyor, yani kart
      yuksekligi ZATEN sarmaya gore ayriliyordu; bu kural DOM'u o modele
      uydurur. */
-  .card li{position:relative;margin-bottom:5px;color:#374151;line-height:1.28;overflow-wrap:anywhere}
+  /* --item-extra-gap: sutunda artan payin madde basina dusen kismi (bkz.
+     geometry.js ADIM 7 / SlideCanvas Card). Tanimli degilse 0px, yani
+     aralik eskisi gibi 5px kalir - mevcut slaytlarin gorunumu degismez. */
+  .card li{position:relative;margin-bottom:calc(var(--item-gap, 5px) + var(--item-extra-gap, 0px));color:#374151;line-height:1.28;overflow-wrap:anywhere}
   .card li .dot{position:absolute;left:-15px;top:0.5em;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:var(--bullet-color, #1F2937)}
   /* Sektör/departman etiketi (**kalın** işaretlenmiş parça) - PO notu
      2026-08-19: "Sektörler çok büyük görünüyor". Madde metninin tam

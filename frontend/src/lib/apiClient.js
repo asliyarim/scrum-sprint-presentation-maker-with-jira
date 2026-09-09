@@ -326,6 +326,17 @@ export async function deletePresentation(id) {
 }
 
 /**
+ * "Sunumum hazır" işareti. Ortak sunum, bir dönemdeki tüm ekipler bu işareti
+ * koyduğunda otomatik oluşacak (bkz. V33__presentation_finalized.sql).
+ *
+ * İşaret REVİZYONDA DÜŞMEZ: PO sunumu hazır işaretledikten sonra içeriğini
+ * güncellerse ortak sunum yeni içeriği gösterir, baştan işaretlemek gerekmez.
+ */
+export async function setPresentationFinalized(id, finalized) {
+  return requestJson(`/api/presentations/${id}/finalize`, { method: finalized ? "POST" : "DELETE" });
+}
+
+/**
  * Ortak (çoklu takım) sunum ekranı için: verilen her takımın EN SON sunumunu
  * döner (bkz. backend PresentationFacade.listLatestPerTeam). Okuma herkese
  * açık olduğundan PO'lar da diğer takımların en son sürümünü buradan görür.

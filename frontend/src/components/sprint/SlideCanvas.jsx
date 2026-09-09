@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import {
   G, BAND, SEGCOL, bandBars, cardsTopFor, fitContent, parseRuns, sectionDefs,
-  extractPriority, extractComment, PRIORITY_COLORS, PRIORITY_ORDER, PRIORITY_UNSET_LABEL, PRIORITY_UNSET_COLOR, hasPriorityTags,
+  extractPriority, extractComment, PRIORITY_COLORS, PRIORITY_ORDER, PRIORITY_UNSET_LABEL, PRIORITY_UNSET_COLOR, hasPriorityTags, gapAt,
   segmentWidths,
 } from "../../lib/geometry";
 import { DEFAULT_CORNER_MESH } from "../../assets/cornerMesh";
@@ -60,9 +60,23 @@ function PriorityLegend() {
   );
 }
 
-function Card({ x, y, w, h, items, sec, fontSize }) {
+function Card({ x, y, w, h, items, sec, fontSize, extraGap = 0 }) {
   return (
-    <div className="card" style={{ left: x * S, top: y * S, width: w * S, height: h * S }}>
+    // --item-gap: geometrinin madde araligi (gapAt) - eskiden CSS'te sabit
+    // 5px'ti ve modelin kullandigi degerle UYUSMUYORDU; kucuk puntolarda CSS
+    // daha genis oldugu icin metin karta sigmiyor, .card overflow:hidden
+    // yuzunden son madde(ler) sessizce kirpilabiliyordu (tarayicida olculdu,
+    // 2026-09-09). Artik iki taraf da AYNI kaynaktan besleniyor.
+    // --item-extra-gap: sutunda artan payin madde BASINA dusen kismi
+    // (bkz. geometry.js ADIM 7).
+    <div
+      className="card"
+      style={{
+        left: x * S, top: y * S, width: w * S, height: h * S,
+        "--item-gap": gapAt(fontSize) * S + "px",
+        "--item-extra-gap": extraGap * S + "px",
+      }}
+    >
       <img className="card-watermark" src={sec.icon} alt="" aria-hidden="true" />
       <div className="acc" style={{ background: "#" + sec.accent, boxShadow: "0 0 10px #" + sec.accent + "70" }} />
       <div className="chd">
@@ -171,7 +185,7 @@ export default function SlideCanvas({ data, tab, assets, scale }) {
   } else {
     const bars = bandBars(data);
     const cardsTop = cardsTopFor(data);
-    const { sections, fsByKey, columns } = fitContent(data, cardsTop);
+    const { sections, fsByKey, columns, ekAralik } = fitContent(data, cardsTop);
     // Her sutun kendi dikey bolunmesini kullanir - sol sutundaki uzun bir kart
     // artik sag sutundaki karti daraltmaz (bkz. geometry.fitContent).
     const sol = columns.left, sag = columns.right;
@@ -213,10 +227,10 @@ export default function SlideCanvas({ data, tab, assets, scale }) {
           />
         )}
         <Band bars={bars} />
-        <Card x={G.X_L} y={cardsTop} w={G.COL_W} h={sol.topH} items={sections.done} sec={SEC.done} fontSize={fsByKey.done} />
-        <Card x={G.X_L} y={sol.yBot} w={G.COL_W} h={sol.botH} items={sections.risk} sec={SEC.risk} fontSize={fsByKey.risk} />
-        <Card x={G.X_R} y={cardsTop} w={G.COL_W} h={sag.topH} items={sections.active} sec={SEC.active} fontSize={fsByKey.active} />
-        <Card x={G.X_R} y={sag.yBot} w={G.COL_W} h={sag.botH} items={sections.pending} sec={SEC.pending} fontSize={fsByKey.pending} />
+        <Card x={G.X_L} y={cardsTop} w={G.COL_W} h={sol.topH} items={sections.done} sec={SEC.done} fontSize={fsByKey.done} extraGap={ekAralik.done} />
+        <Card x={G.X_L} y={sol.yBot} w={G.COL_W} h={sol.botH} items={sections.risk} sec={SEC.risk} fontSize={fsByKey.risk} extraGap={ekAralik.risk} />
+        <Card x={G.X_R} y={cardsTop} w={G.COL_W} h={sag.topH} items={sections.active} sec={SEC.active} fontSize={fsByKey.active} extraGap={ekAralik.active} />
+        <Card x={G.X_R} y={sag.yBot} w={G.COL_W} h={sag.botH} items={sections.pending} sec={SEC.pending} fontSize={fsByKey.pending} extraGap={ekAralik.pending} />
         <div className="s-footer">
           Gizli &amp; Dahili Kullanım&nbsp;&nbsp;|&nbsp;&nbsp;{footerTeam}
           {hasPriorityTags(data) && <PriorityLegend />}

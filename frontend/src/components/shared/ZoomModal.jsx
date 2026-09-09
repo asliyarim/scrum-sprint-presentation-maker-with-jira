@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Modal from "./Modal";
 import Button from "./Button";
 import { useCanvasFit } from "../../hooks/useCanvasFit";
@@ -18,7 +18,14 @@ export default function ZoomModal({ open, onClose, tabs, activeTab, onTabChange,
   useFullscreen(open);
   const idx = tabs ? Math.max(0, tabs.findIndex((t) => t.key === activeTab)) : 0;
   const goTo = (delta) => tabs && onTabChange(tabs[(idx + delta + tabs.length) % tabs.length].key);
-  const remaining = useCountdown(timerSeconds, open);
+  // Sunum sirasinda sayaci duraklatip devam ettirebilme (kullanici istegi
+  // 2026-09-08). Modal her acildiginda duraklatma sifirlanir, yoksa bir
+  // onceki sunumda duraklatilmis halde acilirdi.
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    if (open) setPaused(false);
+  }, [open]);
+  const remaining = useCountdown(timerSeconds, open, undefined, undefined, paused);
   const critical = timerSeconds && remaining <= 15;
 
   // Klavye oklariyla slayt gecisi - PresentationRunnerModal'daki AYNI desen
@@ -46,7 +53,20 @@ export default function ZoomModal({ open, onClose, tabs, activeTab, onTabChange,
     <Modal open={open} onClose={onClose} boxClassName="zoombox stage-dark">
       <div className="zoombar">
         {timerSeconds != null && (
-          <div className={`timer-badge${critical ? " timer-critical" : ""}`}>{formatMmSs(remaining)}</div>
+          <>
+            <div className={`timer-badge${critical ? " timer-critical" : ""}${paused ? " timer-paused" : ""}`}>
+              {formatMmSs(remaining)}
+            </div>
+            <button
+              type="button"
+              className="tab"
+              title={paused ? "Süreyi devam ettir" : "Süreyi durdur"}
+              aria-label={paused ? "Süreyi devam ettir" : "Süreyi durdur"}
+              onClick={() => setPaused((p) => !p)}
+            >
+              {paused ? "▶ Devam" : "⏸ Durdur"}
+            </button>
+          </>
         )}
         {tabs && (
           <div className="carousel-nav">

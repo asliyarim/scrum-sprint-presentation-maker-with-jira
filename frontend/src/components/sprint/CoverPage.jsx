@@ -32,6 +32,9 @@ export default function CoverPage({
   setSprint,
   range,
   setRange,
+  periodStart,
+  periodEnd,
+  onPeriodChange,
   cover,
   coverBackground,
   canEdit = true,
@@ -74,13 +77,47 @@ export default function CoverPage({
                 <input inputMode="numeric" value={sprint} onChange={(e) => setSprint(sanitizeIntegerInput(e.target.value))} onBlur={handleSprintBlur} />
               </div>
             </div>
-            <div className="field grow">
-              <label>Tarih aralığı</label>
+            {/* Tarih aralığı artık SERBEST METİN DEĞİL, takvimden seçiliyor
+                (Gözde onayı 2026-09-09). Seçilen iki tarihten slaytta görünen
+                metin türetilir; böylece hem ekipler her sprintte tarihi
+                güncellemek zorunda kalır hem de otomatik ortak sunum dönemleri
+                güvenilir şekilde eşleştirebilir. Eski kayıtlar açıldığında
+                mevcut metin ayrıştırılıp alanlar dolu gelir; ayrıştırılamazsa
+                alanlar boş kalır ve PO tarihleri seçer.
+                bkz. lib/sprintPeriod.js */}
+            <div className="field">
+              <label>Sprint başlangıcı</label>
               <div className="icon-field">
                 <IconCalendar className="icon-field-icon" style={{ width: 14, height: 14 }} />
-                <input value={range} onChange={(e) => setRange(e.target.value)} />
+                <input
+                  type="date"
+                  value={periodStart}
+                  max={periodEnd || undefined}
+                  onChange={(e) => onPeriodChange(e.target.value, periodEnd)}
+                />
               </div>
             </div>
+            <div className="field">
+              <label>Sprint bitişi</label>
+              <div className="icon-field">
+                <IconCalendar className="icon-field-icon" style={{ width: 14, height: 14 }} />
+                <input
+                  type="date"
+                  value={periodEnd}
+                  min={periodStart || undefined}
+                  onChange={(e) => onPeriodChange(periodStart, e.target.value)}
+                />
+              </div>
+            </div>
+            {range && (
+              <div className="field grow">
+                <label>Slaytta görünecek</label>
+                <div className="icon-field">
+                  <IconCalendar className="icon-field-icon" style={{ width: 14, height: 14 }} />
+                  <input value={range} readOnly tabIndex={-1} style={{ opacity: 0.75 }} />
+                </div>
+              </div>
+            )}
             <div className="field">
               <label>Sunum süresi (dakika)</label>
               <div className="icon-field">

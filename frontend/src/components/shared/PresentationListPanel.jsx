@@ -246,6 +246,17 @@ export default function PresentationListPanel({ teamId, teamName, canManage, sho
                 <span className="presentation-row-sprint">
                   Sprint {p.sprintNo}
                   <span className="presentation-row-version-pill">v{p.currentVersion}</span>
+                  {/* "Hazır" rozeti: PO sunumunu son haline getirdiğini işaretlemiş.
+                      Ortak sunum, bir dönemdeki tüm ekipler işaretlediğinde
+                      oluşacak (bkz. backend V33__presentation_finalized.sql). */}
+                  {p.finalizedAt && (
+                    <span
+                      className="presentation-row-ready-pill"
+                      title={`Hazır olarak işaretlendi${p.finalizedBy ? " · " + p.finalizedBy : ""}`}
+                    >
+                      ✓ Hazır
+                    </span>
+                  )}
                 </span>
                 <span className="presentation-row-meta">
                   <IconCalendar style={{ width: 13, height: 13 }} />

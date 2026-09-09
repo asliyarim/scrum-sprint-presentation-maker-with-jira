@@ -13,6 +13,7 @@ import {
   logout,
   savePresentation,
   updatePresentationInPlace,
+  setPresentationFinalized,
   recordPresentationDownload,
   triggerJiraSync,
 } from "./lib/apiClient";
@@ -62,9 +63,10 @@ import { useVelocityBurndown } from "./hooks/useVelocityBurndown";
 import { useSectorOptions } from "./hooks/useSectorOptions";
 
 import { sectionDefs, SECTION_KEYS, contentReadability } from "./lib/geometry";
+import { parsePeriodText, formatPeriod } from "./lib/sprintPeriod";
 import { buildFullDeck } from "./lib/fullDeckBuilder";
 import { ASSETS } from "./assets/pptxAssets";
-import { hasFteTracking, resolveIsAdmin, resolveTeamTypeFromDepartment } from "./lib/teamTypes";
+import { hasFteTracking, resolveIsAdmin, resolveTeamTypeFromDepartment, bandAutoFills } from "./lib/teamTypes";
 import { nextSprintNo } from "./lib/sprintNumbers";
 
 // Giris ekrani ARTIK BU UYGULAMADA DEGIL: kimlik dogrulama dis kabuga
@@ -408,10 +410,15 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   // Excel'in "Rapor" sayfasi Hedefler bandini besleyecek gercek veriyi icerir
   // (FTE Gerçekleşen/Kalan, Canlı/Kalan Süreç Sayısı - bkz. excelParsers.js/
   // parseBandTargets). Excel yuklendiginde bulunursa bant otomatik doldurulur.
+  // ...ama SADECE bandi varsayilan kullanan takimlarda (RPA, İş Zekası) -
+  // bkz. teamTypes.bandAutoFills. Digerlerinde bant kendiliginden acilmaz;
+  // PO isterse Hedefler bandi anahtarindan kendisi acar.
   useEffect(() => {
-    if (excel.bandTargets.length) band.setSample(excel.bandTargets);
+    if (excel.bandTargets.length && bandAutoFills(sprintForm.teamType)) {
+      band.setSample(excel.bandTargets);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [excel.bandTargets]);
+  }, [excel.bandTargets, sprintForm.teamType]);
 
   // NOT: "Jira'dan Getir" Hedefler bandina ARTIK DOKUNMAZ.
   //
@@ -765,7 +772,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
         // kaydedilmek uzereyse PO uyarilir (bkz. kaydetmeUyarilari). Sadece
         // kiyaslama icin tutulur, forma etkisi yoktur.
         yuklenenIcerikRef.current = p.content?.sections || null;
-        setPresentationMeta({ id: p.id, teamId: p.teamId, sprintNo: p.sprintNo, currentVersion: p.currentVersion });
+        setPresentationMeta({ id: p.id, teamId: p.teamId, sprintNo: p.sprintNo, currentVersion: p.currentVersion, finalizedAt: p.finalizedAt, finalizedBy: p.finalizedBy });
       })
       .catch((err) => setLoadError(err?.message || "Sunum yüklenemedi."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1040,7 +1047,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
         id: aktifSunum?.id ?? null,
         teamId: saveTeamId, sprintNo: sprintForm.sprint, dateRange: sprintForm.range, content: buildSaveContent(),
       });
-      setPresentationMeta({ id: saved.id, teamId: saved.teamId, sprintNo: saved.sprintNo, currentVersion: saved.currentVersion });
+      setPresentationMeta({ id: saved.id, teamId: saved.teamId, sprintNo: saved.sprintNo, currentVersion: saved.currentVersion, finalizedAt: saved.finalizedAt, finalizedBy: saved.finalizedBy });
       setSaveStatus({ loading: false, error: null });
     } catch (err) {
       setSaveStatus({ loading: false, error: err?.message || "Kaydedilemedi." });
@@ -1050,13 +1057,37 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
   // "Güncelle": Ortak Sunum ekranindan (?fromJoint=1) gelindiginde gosterilir
   // - handleSave'in aksine YENI bir surum EKLEMEZ, mevcut guncel surumu
   // YERINDE degistirir (bkz. apiClient.updatePresentationInPlace).
+  /**
+   * "Sunumum Hazır" / "Hazır İşaretini Kaldır".
+   *
+   * Ortak sunumun tetiklenmesi icin gereken isaret (bkz. backend V33). Yeni
+   * SURUM OLUSTURMAZ ve icerigi degistirmez; sadece durum degisir. Isaret
+   * revizyonda dusmedigi icin PO isaretledikten sonra sunumunu guncellemeye
+   * devam edebilir (Gözde karari 2026-09-09).
+   */
+  const [finalizing, setFinalizing] = useState(false);
+  const handleToggleFinalized = async () => {
+    if (!aktifSunum?.id) return;
+    const hedef = !aktifSunum.finalizedAt;
+    setFinalizing(true);
+    setSaveStatus({ loading: false, error: null });
+    try {
+      const saved = await setPresentationFinalized(aktifSunum.id, hedef);
+      setPresentationMeta((m) => (m ? { ...m, finalizedAt: saved.finalizedAt, finalizedBy: saved.finalizedBy } : m));
+    } catch (err) {
+      setSaveStatus({ loading: false, error: err?.message || "Hazır işareti güncellenemedi." });
+    } finally {
+      setFinalizing(false);
+    }
+  };
+
   const handleUpdateInPlace = async () => {
     if (!aktifSunum?.id) return;
     if (!validateBeforeSave()) return;
     setSaveStatus({ loading: true, error: null });
     try {
       const saved = await updatePresentationInPlace(aktifSunum.id, sprintForm.range, buildSaveContent());
-      setPresentationMeta({ id: saved.id, teamId: saved.teamId, sprintNo: saved.sprintNo, currentVersion: saved.currentVersion });
+      setPresentationMeta({ id: saved.id, teamId: saved.teamId, sprintNo: saved.sprintNo, currentVersion: saved.currentVersion, finalizedAt: saved.finalizedAt, finalizedBy: saved.finalizedBy });
       setSaveStatus({ loading: false, error: null });
     } catch (err) {
       setSaveStatus({ loading: false, error: err?.message || "Güncellenemedi." });
@@ -1102,7 +1133,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
     if (!canEdit || !aktifSunum?.id || !saveTeamId) return;
     updatePresentationInPlace(aktifSunum.id, sprintForm.range, buildSaveContent())
       .then((saved) => {
-        setPresentationMeta({ id: saved.id, teamId: saved.teamId, sprintNo: saved.sprintNo, currentVersion: saved.currentVersion });
+        setPresentationMeta({ id: saved.id, teamId: saved.teamId, sprintNo: saved.sprintNo, currentVersion: saved.currentVersion, finalizedAt: saved.finalizedAt, finalizedBy: saved.finalizedBy });
       })
       .catch(() => {
         // Sessiz basarisizlik - navigasyonu engellemez.
@@ -1158,6 +1189,36 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
     excel.loadFile(file, sprintForm.team, applyExcelMeta);
     dashboard.loadFile(file, applyExcelMeta);
     setExcelFileName(file.name);
+  };
+
+  /**
+   * Kapak adimindaki takvim alanlari. Tarihler DEGISKEN DEGIL, mevcut
+   * sprintForm.range metninden TURETILIR - boylece tek bir dogruluk kaynagi
+   * kalir ve kaydetme/yukleme/PPTX yollarinin hicbiri degismez.
+   *
+   * Eski kayitlar serbest metinle ("10 Temmuz – 24 Temmuz") geldigi icin
+   * ayristirilir; ayristirilamazsa alanlar bos gelir ve PO takvimden secer.
+   * bkz. lib/sprintPeriod.js ve backend SprintPeriodParser (ayni kurallar).
+   */
+  const [donem, setDonem] = useState({ start: "", end: "" });
+
+  // range disaridan degistiginde (sunum acildi, Excel yuklendi, takim
+  // degisti...) takvim alanlarini tazele. Kullanici YARIM secim yaptiginda
+  // range degismedigi icin bu efekt tetiklenmez, yani yarim secim korunur.
+  useEffect(() => {
+    const parsed = parsePeriodText(sprintForm.range);
+    setDonem({ start: parsed?.start || "", end: parsed?.end || "" });
+  }, [sprintForm.range]);
+
+  /**
+   * Takvimden secim. Iki tarih de secilince slaytta gorunecek metin uretilir;
+   * yalnizca biri secildiyse metin HENUZ yazilmaz (yarim secim eski degeri
+   * silmesin), sadece takvim alani guncellenir.
+   */
+  const handlePeriodChange = (startIso, endIso) => {
+    setDonem({ start: startIso || "", end: endIso || "" });
+    const metin = formatPeriod(startIso, endIso);
+    if (metin) sprintForm.setRange(metin);
   };
 
   const sprintData = { ...sprintForm.data, showBand: band.show, targets: band.bars };
@@ -1245,6 +1306,9 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
               updating={saveStatus.loading}
               onJiraSync={canEdit ? handleJiraSync : null}
               jiraSyncing={jiraSyncing}
+              onToggleFinalized={canEdit && aktifSunum?.id ? handleToggleFinalized : null}
+              finalized={!!aktifSunum?.finalizedAt}
+              finalizing={finalizing}
             />
           ) : (
             <DashboardTopActions
@@ -1258,6 +1322,9 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
               updating={saveStatus.loading}
               onJiraSync={canEdit ? handleJiraSync : null}
               jiraSyncing={jiraSyncing}
+              onToggleFinalized={canEdit && aktifSunum?.id ? handleToggleFinalized : null}
+              finalized={!!aktifSunum?.finalizedAt}
+              finalizing={finalizing}
             />
           )
         }
@@ -1312,6 +1379,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
               readOnlyView={readOnlyView}
               sprint={sprintForm.sprint} setSprint={sprintForm.setSprint}
               range={sprintForm.range} setRange={sprintForm.setRange}
+              periodStart={donem.start} periodEnd={donem.end} onPeriodChange={handlePeriodChange}
               cover={cover}
               coverBackground={coverBackground}
               canEdit={canEdit}

@@ -58,6 +58,15 @@ export const FS_READABLE_MIN = 7.5;
 // verilir - bkz. fitContent ADIM 4.
 export const FS_SPREAD_MAX = 1.6;
 
+// Sutunda artan pay kartlara YUKSEKLIK olarak degil, MADDE ARALIGI olarak
+// verilir (bkz. fitContent ADIM 7) ve bu pay sinirlidir: bir maddenin normal
+// araligi en fazla bu katsayi kadar acilabilir. Sinir olmasaydi 3 maddelik bir
+// kartta maddeler arasi bosluk parmak kadar acilir, "yayilmis" degil "dagilmis"
+// gorunurdu. Sigmayan pay sutunun altinda bos kalir - kartin ICINDE sahte
+// bosluk birakmaktan iyidir (kullanici bildirimi 2026-09-08, Gözde:
+// "altinda buyuk bir bosluk varmis gibi gosterip ilgili alana doldurmuyor").
+export const MAX_EXTRA_GAP_FACTOR = 2;
+
 // NOT: MAX_ITEMS_PER_COLUMN (sutun basina 14 madde siniri) KALDIRILDI
 // (kullanici karari 2026-09-07). Madde sayisina gore kirpma yapilmaz; PO'nun
 // yazdigi tum maddeler slayta girer, sigdirma yalnizca yazi boyutuyla olur -
@@ -154,8 +163,31 @@ export function sectionDefs(assets) {
 }
 
 const textW = G.COL_W - G.ACC_ZONE - G.PAD_R - 0.16;
-export const cplAt = (f) => Math.floor(textW / (f * 0.0086));
-export const lhAt = (f) => f * 0.0178 + 0.02;
+
+// Bu iki sabit, bir maddenin kac satir tutacagini ve bir satirin yuksekligini
+// TAHMIN eder. Tahmin GERCEKTEN fazla yer ayirirsa kart icerikten uzun cizilir
+// ve altinda bosluk kalir; ayrica gereksiz yere daha kucuk punto secilir
+// (kullanici bildirimi 2026-09-08, Gözde: "yazi boyutunu kucultuyor, ilgili
+// alana doldurmuyor, gorunum estetik degil").
+//
+// Tarayicida (Segoe UI, .card li line-height 1.28, font-size = punto*1.333)
+// olculdu, 7-16pt araliginda:
+//   - karakter genisligi sabiti gercekte 0.00681 (eski deger 0.0086, yani her
+//     karakter %26 GENIS sayiliyordu - metin sarmadigi halde "sarar" deniyordu)
+//   - satir yuksekligi tam olarak f*0.0178; eski formuldeki +0.02 (satir basina
+//     ~2px) tamamen fazladan ayrilan paydi
+//
+// Olculen degerlere YAPISMIYORUZ, guvenlik payi birakiyoruz: PPTX Calibri
+// kullanir (Segoe UI'dan dar, yani orada daha da rahat sigar) ama PowerPoint'in
+// kendi sarma davranisi birebir ayni degil. Model fazla iyimser olursa metin
+// karta sigmaz ve .card overflow:hidden yuzunden SESSIZCE KIRPILIR - bu, bosluk
+// birakmaktan cok daha kotudur (bkz. app.css'teki 2026-08-25 bildirimi).
+// Bu yuzden: karakter sabiti olculenin (0.00681) ustunde 0.0070, satir payi
+// 0.02 yerine 0.006. Tarayicida dogrulandi: her senaryoda model >= gercek,
+// yani hicbir yerde kirpma olmuyor. PPTX tarafinda ayrica fit:"shrink" son
+// guvenlik agi olarak duruyor.
+export const cplAt = (f) => Math.floor(textW / (f * 0.0070));
+export const lhAt = (f) => f * 0.0178 + 0.006;
 
 function stripPriorityTag(t) {
   return String(t).replace(/##(.+?)##/g, "");
@@ -328,6 +360,8 @@ export function fitContent(d, cardsTop) {
   // Iki sutunun icerigi dengeliyse sonuc eskisiyle AYNI kalir - kartlar yine
   // hizali gorunur.
   const columns = {};
+  // Kart basina, mevcut madde araligina EKLENECEK pay (inc). Bkz. ADIM 7.
+  const ekAralik = {};
   COLUMN_KEYS.forEach(([ust, alt], i) => {
     const butce = avail - G.GAP_Y; // iki kart + aralarindaki bosluk
     const cift = [ust, alt];
@@ -426,11 +460,49 @@ export function fitContent(d, cardsTop) {
       if (!buyudu) break;
     }
 
-    // Artan yer de ihtiyaca ORANTILI dagitilir (eskiden yariyariya) - cok
-    // maddeli kart hem daha buyuk puntoyu hem de daha uzun bir karti alir.
-    const dogal = { ust: cardH(shown(ust), fsOf(ust)), alt: cardH(shown(alt), fsOf(alt)) };
-    const ustPayi = toplamIhtiyac > 0 ? ihtiyac[ust] / toplamIhtiyac : 0.5;
-    const { topH, botH } = stretchRowHeights(dogal.ust, dogal.alt, cardsTop, ustPayi);
+    // ADIM 7 - KART YUKSEKLIGI ve ARTAN PAYIN DAGITIMI.
+    //
+    // Eskiden artan yer kartlara dogrudan YUKSEKLIK olarak ekleniyordu
+    // (stretchRowHeights): kart uzuyor ama icindeki yazi ayni kaldigi icin
+    // ALTINDA BUYUK BIR BOSLUK olusuyordu. En uc ornek: 1 maddelik bir kart
+    // 1.04" icerikle 3.19" yuksekliginde ciziliyordu, yani kartin %67'si bos
+    // (kullanici bildirimi 2026-09-08, Gözde: "yazi boyutunu kucultuyor,
+    // ilgili alana doldurmuyor, gorunum estetik degil").
+    //
+    // Artik kart icerigi kadar cizilir; artan pay ancak MADDE ARALIGINI
+    // acacak kadar verilir (kart dolu gorunur, yazi yayilir) ve bu da
+    // sinirlidir - tek maddelik kart HIC gerilmez, cunku yayilacak bir
+    // araligi yoktur. Sigmayan pay sutunun altinda bos kalir; kartin
+    // icinde sahte bosluk birakmaktan iyidir.
+    const dogalUst = cardH(shown(ust), fsOf(ust));
+    const dogalAlt = cardH(shown(alt), fsOf(alt));
+    const bosPay = butce - (dogalUst + dogalAlt);
+
+    /** Bir kartin madde araligi acilarak en fazla ne kadar uzayabilecegi. */
+    const esneklik = (k) => {
+      const n = shown(k).length;
+      if (n <= 1) return 0;
+      return (n - 1) * gapAt(fsOf(k)) * MAX_EXTRA_GAP_FACTOR;
+    };
+
+    let ekUst = 0;
+    let ekAlt = 0;
+    if (bosPay > 0) {
+      const esnUst = esneklik(ust);
+      const esnAlt = esneklik(alt);
+      const toplamEsn = esnUst + esnAlt;
+      if (toplamEsn > 0) {
+        ekUst = Math.min(esnUst, bosPay * (esnUst / toplamEsn));
+        ekAlt = Math.min(esnAlt, bosPay * (esnAlt / toplamEsn));
+      }
+    }
+
+    const topH = dogalUst + ekUst;
+    const botH = dogalAlt + ekAlt;
+    // Madde BASINA dusen ek aralik - SlideCanvas ve sprintDeckBuilder bunu
+    // mevcut aralige EKLER (deger 0 iken davranis eskisiyle birebir ayni).
+    ekAralik[ust] = shown(ust).length > 1 ? ekUst / (shown(ust).length - 1) : 0;
+    ekAralik[alt] = shown(alt).length > 1 ? ekAlt / (shown(alt).length - 1) : 0;
     columns[i === 0 ? "left" : "right"] = { topH, botH, yBot: cardsTop + topH + G.GAP_Y };
   });
 
@@ -440,7 +512,7 @@ export function fitContent(d, cardsTop) {
 
   // topH/botH geriye donuk uyumluluk icin SOL sutunun degerleridir - kose
   // deseni (CornerMesh) zaten sol-alt Riskler kartina hizalanir.
-  return { sections, fsByKey, columns, topH: columns.left.topH, botH: columns.left.botH };
+  return { sections, fsByKey, columns, ekAralik, topH: columns.left.topH, botH: columns.left.botH };
 }
 
 // Öncelik degerlerinin slaytta/PPTX'te gosterilecegi renkler (SEGCOL paletiyle

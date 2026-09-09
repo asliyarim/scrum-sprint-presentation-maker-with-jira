@@ -254,10 +254,17 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
 
   const myTeamIds = personnel?.teamIds || (personnel?.teamId != null ? [personnel.teamId] : []);
 
-  const handleFetch = async () => {
+  /**
+   * Secilen (sunum, surum) ciftlerinin icerigini ceker ve results a yazar.
+   * Onizleme ACMAZ - "PPTX Indir" ve "Ortak Sunumu Kaydet" de bunu kullanir,
+   * boylece indirmek icin once onizlemek gerekmez (kullanici bildirimi
+   * 2026-09-08, Gözde: "onizle demedigin surece ortak sunumu indiremiyorsun,
+   * buna gerek yok").
+   */
+  const loadResults = async () => {
     if (picks.length === 0) {
       setError("En az bir sunum seçmelisiniz.");
-      return;
+      return null;
     }
     setLoading(true);
     setError(null);
@@ -290,19 +297,33 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
         });
       }
       setResults(built);
-      // "Önizle" tekli sunumdaki "⤢ Preview" ile ayni mantikla calisir -
-      // onizleme acmak = sunumu baslatmak (bkz. kullanici bildirimi): sonuc
-      // varsa dogrudan sirali/timerli tam ekran moda gecilir, ayrica bir
-      // "Sunumu Başlat" butonuna basmaya gerek yok.
-      if (built.length > 0) setRunnerOpen(true);
       if (built.length < picks.length) {
         setError("Bazı seçilen sürümler getirilemedi, listeye dahil edilmedi.");
       }
+      return built;
     } catch (err) {
       setError(err?.message || "Sunumlar yüklenemedi.");
+      return null;
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * "Önizle" tekli sunumdaki "⤢ Preview" ile ayni mantikla calisir -
+   * onizleme acmak = sunumu baslatmak (bkz. kullanici bildirimi): sonuc
+   * varsa dogrudan sirali/timerli tam ekran moda gecilir, ayrica bir
+   * "Sunumu Başlat" butonuna basmaya gerek yok.
+   */
+  const handleFetch = async () => {
+    const built = await loadResults();
+    if (built && built.length > 0) setRunnerOpen(true);
+  };
+
+  /** Indirme/kaydetme icin sonuclari hazir hale getirir - zaten varsa tekrar cekmez. */
+  const ensureResults = async () => {
+    if (results && results.length > 0) return results;
+    return loadResults();
   };
 
   /** "Düzenle" - o takimin sunumunu tam sihirbaz editorunde acar, "Güncelle" butonunu göstermesi icin isaretlenir (bkz. üstteki modül yorumu). */
@@ -332,14 +353,16 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
    * icerik versions tablosundan taze okunur (bkz. lib/jointPicks).
    */
   const handleSaveJoint = async () => {
-    if (!results || results.length === 0) return;
     setSaving(true);
     setError(null);
     setSavedInfo(null);
     try {
-      const baslik = `Ortak Sunum · ${commonEndDate(results) || new Date().toLocaleDateString("tr-TR")}`;
-      const saved = await saveJointPresentation(baslik, toSavablePicks(results));
-      setSavedInfo(`${saved.title} kaydedildi (${results.length} takım). Admin panelindeki "Ortak Sunumlar" bölümünden tekrar indirilebilir.`);
+      // Onizleme yapilmadan da kaydedilebilir - icerik gerekiyorsa burada cekilir.
+      const veri = await ensureResults();
+      if (!veri || veri.length === 0) return;
+      const baslik = `Ortak Sunum · ${commonEndDate(veri) || new Date().toLocaleDateString("tr-TR")}`;
+      const saved = await saveJointPresentation(baslik, toSavablePicks(veri));
+      setSavedInfo(`${saved.title} kaydedildi (${veri.length} takım). Admin panelindeki "Ortak Sunumlar" bölümünden tekrar indirilebilir.`);
     } catch (err) {
       setError(err?.message || err?.error || "Ortak sunum kaydedilemedi.");
     } finally {
@@ -348,11 +371,13 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
   };
 
   const handleJointExport = async (cornerMesh) => {
-    if (!results || results.length === 0) return;
     setExporting(true);
     setError(null);
     try {
-      const pptx = await buildJointDeck(results, assets, theme === "dark" ? "dark" : "light", cornerMesh);
+      // Onizleme yapilmadan da indirilebilir - icerik gerekiyorsa burada cekilir.
+      const veri = await ensureResults();
+      if (!veri || veri.length === 0) return;
+      const pptx = await buildJointDeck(veri, assets, theme === "dark" ? "dark" : "light", cornerMesh);
       // Dosya adi PO'larin kullandigi bicimle ayni: "07-09-2026 Dijital
       // Uygulamalar ve Ürün Geliştirme - Sprint Raporları.pptx" (Gözde'nin
       // paylastigi ornek dosya, 2026-09-07).
@@ -360,7 +385,7 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
       const iki = (n) => String(n).padStart(2, "0");
       const tarih = `${iki(g.getDate())}-${iki(g.getMonth() + 1)}-${g.getFullYear()}`;
       await pptx.writeFile({ fileName: `${tarih} ${JOINT_COVER_TITLE} - ${JOINT_COVER_SUBTITLE}.pptx` });
-      await recordPresentationDownload("BATCH", [...new Set(results.map((r) => r.teamId))]).catch(() => {
+      await recordPresentationDownload("BATCH", [...new Set(veri.map((r) => r.teamId))]).catch(() => {
         // indirme kaydi best-effort - basarisiz olsa da kullaniciyi engellemez
       });
     } catch (err) {
@@ -546,15 +571,21 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
                     Sunumu Tekrar Başlat
                   </Button>
                 )}
-                {results && (
-                  <Button variant="soft" loading={exporting} loadingLabel="Hazırlanıyor…" onClick={() => setPptxTemplateOpen(true)}>
+                {/* Indirme ve kaydetme ONIZLEMEYE BAGLI DEGIL - secim varsa
+                    yeterli. Eskiden bu iki buton yalnizca "Önizle"den sonra
+                    (results dolunca) goruntuleniyordu, yani indirmek icin once
+                    onizlemek gerekiyordu (kullanici bildirimi 2026-09-08,
+                    Gözde: "buna gerek yok"). Icerik gerekiyorsa handler
+                    icinde ensureResults ile cekilir. */}
+                {picks.length > 0 && (
+                  <Button variant="soft" loading={exporting || loading} loadingLabel="Hazırlanıyor…" onClick={() => setPptxTemplateOpen(true)}>
                     PPTX İndir (Ortak)
                   </Button>
                 )}
                 {/* Kaydetme: birlestirmenin KENDISI degil, secilen (sunum, surum)
                     listesi saklanir - admin panelinde tarih tarih gorunur ve
                     tekrar indirilebilir (Cagdas Bey istegi, 2026-09-07). */}
-                {results && results.length > 0 && (
+                {picks.length > 0 && (
                   <Button variant="soft" loading={saving} loadingLabel="Kaydediliyor…" onClick={handleSaveJoint}>
                     Ortak Sunumu Kaydet
                   </Button>

@@ -763,6 +763,13 @@ body {
   border: none;
   box-shadow: 0 6px 20px rgba(34, 192, 126, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
+/* Sayac duraklatildiginda (bkz. useCountdown `paused`) sonuk gorunur ve
+   yanip sonme animasyonu durur - sunum yapan kisi sayacin isledigini mi
+   durdugunu mu bir bakista anlasin. */
+.timer-badge.timer-paused {
+  opacity: 0.55;
+  animation: none;
+}
 .timer-critical .timer-badge,
 .timer-badge.timer-critical {
   background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
@@ -2710,6 +2717,20 @@ header.topbar .btn:hover {
   font-weight: 700;
   color: var(--aksa-blue);
   background: rgba(13, 94, 168, 0.1);
+}
+/* "Hazır" rozeti - PO sunumunu ortak sunuma dahil edilmeye hazır işaretledi.
+   Sürüm rozetiyle aynı ölçüde, ama yeşil: bir sürüm bilgisi değil, bir durum. */
+.presentation-row-ready-pill {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #15803d;
+  background: rgba(22, 163, 74, 0.12);
+}
+.theme-dark .presentation-row-ready-pill {
+  color: #86efac;
+  background: rgba(22, 163, 74, 0.2);
 }
 .theme-dark .presentation-row-version-pill {
   color: var(--aksa-blue-light);
