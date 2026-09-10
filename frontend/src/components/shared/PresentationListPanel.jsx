@@ -8,8 +8,8 @@ import UnifiedPreviewPane from "./UnifiedPreviewPane";
 import SlideCanvas from "../sprint/SlideCanvas";
 import DashboardSlideCanvas from "../dashboard/DashboardSlideCanvas";
 import VelocityBurndownSlideCanvas from "../sprint/VelocityBurndownSlideCanvas";
-import { IconPresentation, IconHistory, IconEdit, IconCalendar, IconDownload, IconTrash } from "./icons";
-import { fetchPresentations, fetchPresentation, fetchPresentationVersions, rollbackPresentation, deletePresentation, recordPresentationDownload } from "../../lib/apiClient";
+import { IconPresentation, IconCalendar, IconDownload } from "./icons";
+import { fetchPresentations, fetchPresentation, fetchPresentationVersions, rollbackPresentation, deletePresentation, recordPresentationDownload, setPresentationFinalized } from "../../lib/apiClient";
 import { sortBySprintNo } from "../../lib/sprintNumbers";
 import { sprintDataFromContent } from "../../lib/presentationContent";
 import { buildFullDeck } from "../../lib/fullDeckBuilder";
@@ -34,6 +34,7 @@ export default function PresentationListPanel({ teamId, teamName, canManage, sho
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [historyFor, setHistoryFor] = useState(null); // { id, sprintNo }
+  const [finalizingId, setFinalizingId] = useState(null);
 
   // Satira tiklaninca sag/altta acilan "canli onizleme" - sihirbazdaki
   // UnifiedPreviewPane'in AYNISI (Kapak/İçerik/Dashboard karuseli + Preview
@@ -72,6 +73,34 @@ export default function PresentationListPanel({ teamId, teamName, canManage, sho
       .then((liste) => setPresentations(sortBySprintNo(liste)))
       .catch((err) => setError(err?.message || "Sunumlar yüklenemedi."))
       .finally(() => setLoading(false));
+  };
+
+  /**
+   * "Sunumum Hazır" — listeden TEK TIKLA işaretleme.
+   *
+   * Bu işaret düzenleme ekranının üst çubuğunda da var, ama otomatik ortak
+   * sunumun tamamı buna basılmasına bağlı: PO butonu bulamazsa özellik hiç
+   * çalışmaz (kullanıcı bildirimi 2026-09-10 — "sunumum hazır butonu nere,
+   * PO'ların basacağı anlamadım"). Bu yüzden sunumun görüldüğü yerde de
+   * duruyor.
+   *
+   * İçeriği DEĞİŞTİRMEZ, yeni sürüm OLUŞTURMAZ; işaretledikten sonra
+   * düzenlemeye devam edilebilir, işaret düşmez (bkz. backend V33).
+   * Yetki backend'de zorunlu tutulur - başka takımın sunumunda 403 döner.
+   */
+  const handleToggleFinalized = async (p) => {
+    setFinalizingId(p.id);
+    setError(null);
+    try {
+      const guncel = await setPresentationFinalized(p.id, !p.finalizedAt);
+      setPresentations((prev) => prev.map((x) => (x.id === p.id
+        ? { ...x, finalizedAt: guncel.finalizedAt, finalizedBy: guncel.finalizedBy }
+        : x)));
+    } catch (err) {
+      setError(err?.message || "Hazır işareti güncellenemedi.");
+    } finally {
+      setFinalizingId(null);
+    }
   };
 
   const handleDelete = async () => {
@@ -243,6 +272,11 @@ export default function PresentationListPanel({ teamId, teamName, canManage, sho
                 <span className="presentation-row-thumb-label">Sprint {p.sprintNo}</span>
               </div>
               <div className="presentation-row-main">
+                {/* Aksiyonlar SPRINT BASLIGININ SAGINDA, ayni satirda: kendi
+                    satirlarina indiklerinde kart gereksiz uzuyordu (kullanici
+                    bildirimi 2026-09-10 - "kart dev gibi olmuş"). Basligin
+                    yanindaki bos alan zaten butonlara yetiyor. */}
+                <div className="presentation-row-head">
                 <span className="presentation-row-sprint">
                   Sprint {p.sprintNo}
                   <span className="presentation-row-version-pill">v{p.currentVersion}</span>
@@ -258,6 +292,48 @@ export default function PresentationListPanel({ teamId, teamName, canManage, sho
                     </span>
                   )}
                 </span>
+                <div className="presentation-row-actions" onClick={(e) => e.stopPropagation()}>
+                <Button variant="soft" onClick={() => setHistoryFor({ id: p.id, sprintNo: p.sprintNo, currentVersion: p.currentVersion })}>
+                  Sürümler
+                </Button>
+                <Button variant="primary" onClick={() => navigate(`/editor/${p.id}`)}>
+                  Düzenle
+                </Button>
+                {/* Durum RENKLE degil ETIKETLE anlatiliyor: isaretliyken
+                    "Hazır ✓", degilken "Hazırla". Buton dolgulu yesil olunca
+                    yanindaki "Düzenle" ile iki yesil yan yana dusuyor ve kart
+                    dagilmis gorunuyordu (kullanici bildirimi 2026-09-10).
+                    Zaten sprint basliginin yanindaki "✓ Hazır" rozeti durumu
+                    ayrica soyluyor. */}
+                {canManage && (
+                  <Button
+                    variant="soft"
+                    loading={finalizingId === p.id}
+                    loadingLabel="…"
+                    onClick={() => handleToggleFinalized(p)}
+                    title={
+                      p.finalizedAt
+                        ? `Hazır olarak işaretli${p.finalizedBy ? " · " + p.finalizedBy : ""}. Tekrar basarsanız işaret kalkar ve ortak sunuma girmez.`
+                        : "Sunumunuz son haline geldiyse işaretleyin - dönemdeki tüm ekipler işaretlediğinde ortak sunum kendiliğinden oluşur."
+                    }
+                  >
+                    {p.finalizedAt ? "Hazır ✓" : "Hazırla"}
+                  </Button>
+                )}
+                <Button
+                  variant="soft"
+                  loading={downloadingId === p.id}
+                  loadingLabel="Hazırlanıyor…"
+                  onClick={() => setPptxRequest({ type: "single", p })}
+                  title="Bu sprintin sunumunu PPTX olarak indir"
+                >
+                  PPTX
+                </Button>
+                <Button variant="ghost" className="presentation-delete-btn" onClick={() => setDeleteFor({ id: p.id, sprintNo: p.sprintNo })}>
+                  Sil
+                </Button>
+                </div>
+                </div>
                 <span className="presentation-row-meta">
                   <IconCalendar style={{ width: 13, height: 13 }} />
                   {p.dateRange || "—"}
@@ -265,29 +341,6 @@ export default function PresentationListPanel({ teamId, teamName, canManage, sho
                 <span className="presentation-row-meta presentation-row-meta-sub">
                   {formatDateTime(p.updatedAt)}{p.updatedBy ? ` · ${p.updatedBy}` : ""}
                 </span>
-              </div>
-              <div className="presentation-row-actions" onClick={(e) => e.stopPropagation()}>
-                <Button variant="soft" onClick={() => setHistoryFor({ id: p.id, sprintNo: p.sprintNo, currentVersion: p.currentVersion })}>
-                  <IconHistory style={{ width: 15, height: 15 }} />
-                  Sürüm Geçmişi
-                </Button>
-                <Button variant="primary" onClick={() => navigate(`/editor/${p.id}`)}>
-                  <IconEdit style={{ width: 15, height: 15 }} />
-                  Düzenle
-                </Button>
-                <Button
-                  variant="soft"
-                  loading={downloadingId === p.id}
-                  loadingLabel="Hazırlanıyor…"
-                  onClick={() => setPptxRequest({ type: "single", p })}
-                >
-                  <IconDownload style={{ width: 15, height: 15 }} />
-                  PPTX İndir
-                </Button>
-                <Button variant="ghost" className="presentation-delete-btn" onClick={() => setDeleteFor({ id: p.id, sprintNo: p.sprintNo })}>
-                  <IconTrash style={{ width: 15, height: 15 }} />
-                  Sil
-                </Button>
               </div>
             </div>
           ))}

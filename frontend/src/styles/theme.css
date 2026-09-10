@@ -2714,12 +2714,18 @@ header.topbar .btn:hover {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
+/* TABAN GENISLIK SART: "flex: 1" (= flex-basis 0) + min-width:0 iken metin
+   sutunu, aksiyon butonlari yer istedikce SIFIRA kadar eziliyordu - "Sprint
+   13" iki satira boluniyor, tarih dikey bir seride kiriliyordu (kullanici
+   bildirimi 2026-09-10, "Sunumum Hazır" butonu eklendikten sonra). Gercek
+   bir taban verilince satir once SARIYOR: sigmayan aksiyon blogu alt satira
+   iner, metin okunur genisligini korur. */
 .presentation-row-main {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 260px;
 }
 .presentation-row-sprint {
   display: flex;
@@ -2771,11 +2777,49 @@ header.topbar .btn:hover {
   font-size: 11.5px;
   opacity: 0.85;
 }
+/* Baslik satiri: solda "Sprint 18 · v3 · ✓Hazır", sagda aksiyonlar. Tarih ve
+   son guncelleme bunun ALTINDA, tam genislikte akar - boylece butonlar kendi
+   satirini isgal etmez ve kart kisa kalir (kullanici bildirimi 2026-09-10). */
+.presentation-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.presentation-row-head .presentation-row-sprint {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+/* Satir aksiyonlari, sayfanin genel butonlarindan DAHA KUCUK: bes tanesi
+   basligin yanindaki bosluga sigmali. Ikon+etiket okunur kalir.
+   ESIT GENISLIK: dogal genislikte birakilinca bes buton farkli boyda cikip
+   dagimik gorunuyordu (kullanici bildirimi 2026-09-10 - "her bir butonun
+   boyutu aynı değil, bunları aynı yap"). min-width hepsini ayni kaliba
+   sokar; icerik ortalanir. */
+.presentation-row-actions .btn {
+  padding: 6px 10px;
+  font-size: 12.5px;
+  border-radius: 7px;
+  min-width: 88px;
+  justify-content: center;
+}
+.presentation-row-actions .btn svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
 .presentation-row-actions {
   display: flex;
-  gap: 8px;
-  flex: none;
-  /* Dar panelde 4. buton (Sil) satiri asip ekran disina tasiyordu; wrap ile
+  gap: 6px;
+  /* "flex: none" DEGIL: o haldeyken blok max-content genisliginde kalip dar
+     panelde satiri asiyordu (5. buton "Sunumum Hazır" eklenince gorunur
+     oldu, kullanici bildirimi 2026-09-10). Kucule bilen bir taban verilince
+     asagidaki flex-wrap gercekten devreye girer ve butonlar kendi icinde
+     alt satira iner - hicbiri kartin disina tasmaz. */
+  flex: 0 1 auto;
+  min-width: 0;
+  /* Dar panelde butonlar satiri asip ekran disina tasiyordu; wrap ile
      alt satira duser, sağa yasli kalir (kullanici bildirimi 2026-09-01). */
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -4938,4 +4982,104 @@ header.topbar .btn:hover {
   margin-top: 10px;
   font-size: 12.5px;
   color: var(--mut);
+}
+
+
+
+/* ---------------------------------------------------------------------- */
+/* Donem paneli - iki kademeli acilir (bkz. PeriodPanel)                   */
+/* ---------------------------------------------------------------------- */
+.donem-panel-baslik {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--teal);
+  cursor: pointer;
+  text-align: left;
+}
+.donem-panel-ad {
+  flex: none;
+}
+/* Kapali haldeyken paneli acmaya deger mi, tek bakista belli olsun. */
+.donem-panel-ozet {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--mut);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.donem-panel-ozet b {
+  color: var(--aksa-green-dark);
+}
+.donem-ok {
+  flex: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--mut);
+  transition: transform 0.18s ease;
+}
+.donem-ok.acik {
+  transform: rotate(90deg);
+}
+
+/* Kartin DIS YUZU: tarih + sayaclar + "Bu donemi sec". Detay buna basinca acilir. */
+.donem-ozet {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+}
+.donem-ozet-sol {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.donem-ozet-sag {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: default;
+}
+.donem-ozet:focus-visible {
+  outline: 2px solid var(--aksa-blue-light);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+.donem-ozet .donem-bar {
+  margin-bottom: 0;
+}
+
+/* Kartin ACILAN kismi - ekip rozetleri, cakisma uyarisi, siralama notu. */
+.donem-detay {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.donem-detay-not {
+  font-size: 12.5px;
+  color: var(--mut);
+  margin-bottom: 10px;
+}
+.donem-detay .donem-siralama-notu,
+.donem-detay .donem-uyari {
+  margin-top: 10px;
+}
+@media (max-width: 720px) {
+  .donem-ozet {
+    flex-wrap: wrap;
+  }
+  .donem-ozet-sag {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
