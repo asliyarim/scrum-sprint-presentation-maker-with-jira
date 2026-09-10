@@ -2801,7 +2801,12 @@ header.topbar .btn:hover {
   padding: 6px 10px;
   font-size: 12.5px;
   border-radius: 7px;
-  min-width: 88px;
+  /* 74px = en uzun etiketin ("Sürümler") dogal genisligi. Daha buyuk bir
+     deger butonlari esit tutar ama "✓ Hazır" rozeti tasiyan satirlarda
+     basligin yanina sigmayip alt satira dusuruyor (olculdu 2026-09-10:
+     76px'te 730px panelde tasiyor, 74px'te siğiyor). Daha kucugunde ise
+     "Sürümler" digerlerinden genis kalip esitlik bozuluyor. */
+  min-width: 74px;
   justify-content: center;
 }
 .presentation-row-actions .btn svg {
@@ -5135,28 +5140,95 @@ header.topbar .btn:hover {
   flex-wrap: wrap;
 }
 
-/* Slayttaki renk aciklamasi - bandin hemen altinda, kucuk. Oncelik
-   aciklamasiyla (.s-legend) ayni gorsel dil. */
-.s-benefit-legend {
-  position: absolute;
-  left: 0;
-  right: 0;
+
+
+/* Slayttaki renk aciklamasi ALT BILGIDE, takim adinin yaninda - sagdaki
+   oncelik aciklamasiyla (.s-legend) ayni gorsel dil ve ayni kucukluk.
+   Yalnizca zaman disi fayda cubugu doldurulmussa cizilir. */
+.s-benefit-legend.s-legend {
+  margin-left: 18px;
+  gap: 10px;
+  font-size: 8.5px;
+  opacity: 0.9;
+}
+.s-benefit-legend.s-legend i {
+  width: 6px;
+  height: 6px;
+}
+
+
+/* ---------------------------------------------------------------------- */
+/* Zaman Disi Fayda penceresi (sunum editoru ust cubugu)                   */
+/* ---------------------------------------------------------------------- */
+/* TEK SUTUN liste: uc sutunlu izgarada uzun kategori adlari kirpilmis gibi
+   duruyordu (kullanici bildirimi 2026-09-10). Renk noktasi slayttaki
+   cubukla ayni sirayi hatirlatir. */
+.benefit-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.benefit-satir {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.benefit-satir:last-child {
+  border-bottom: 0;
+}
+.benefit-satir-ust {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  font-size: 9px;
-  color: #4B5563;
+  gap: 10px;
+  cursor: pointer;
 }
-.s-benefit-legend .s-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.s-benefit-legend i {
-  width: 7px;
-  height: 7px;
+.benefit-satir-ust .dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  display: inline-block;
+}
+.benefit-satir-ad {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.benefit-sayi {
+  flex: none;
+  width: 82px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 13.5px;
+  font-family: inherit;
+  font-weight: 700;
+}
+/* Tutar satiri yalnizca finansal kazanimda - kategori adinin ALTINDA,
+   noktanin hizasindan girintili ki ona ait oldugu anlasilsin. */
+.benefit-satir-tutar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px 19px;
+}
+.benefit-satir-tutar-et {
+  flex: 1;
+  font-size: 12px;
+  color: var(--mut);
+}
+.benefit-satir-tutar input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  width: 120px;
+  text-align: right;
+}
+.benefit-satir-tutar input.benefit-para {
+  width: 56px;
+  text-align: center;
+  font-weight: 700;
 }

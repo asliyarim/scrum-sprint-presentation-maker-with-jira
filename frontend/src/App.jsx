@@ -21,6 +21,7 @@ import ProfilePage from "./components/shared/ProfilePage";
 import AdminHomePage from "./components/shared/AdminHomePage";
 import MonitoringPage from "./components/shared/MonitoringPage";
 import BenefitsAdminPage from "./components/shared/BenefitsAdminPage";
+import BenefitsModal from "./components/sprint/BenefitsModal";
 import PresentationsPage from "./components/shared/PresentationsPage";
 import JointPresentationPage from "./components/shared/JointPresentationPage";
 import TopBar from "./components/shared/TopBar";
@@ -66,7 +67,7 @@ import { sectionDefs, SECTION_KEYS, contentReadability } from "./lib/geometry";
 import { parsePeriodText, formatPeriod } from "./lib/sprintPeriod";
 import { buildFullDeck } from "./lib/fullDeckBuilder";
 import { ASSETS } from "./assets/pptxAssets";
-import { hasFteTracking, resolveIsAdmin, resolveTeamTypeFromDepartment, bandAutoFills } from "./lib/teamTypes";
+import { hasFteTracking, resolveIsAdmin, resolveTeamTypeFromDepartment, bandAutoFills, tracksBenefits } from "./lib/teamTypes";
 import { nextSprintNo } from "./lib/sprintNumbers";
 
 // Giris ekrani ARTIK BU UYGULAMADA DEGIL: kimlik dogrulama dis kabuga
@@ -582,6 +583,10 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
    * 2026-08-25: "DU sprint 10'u ezdi ve üzerine yazdı", "mobili dijital
    * uygulamaların içerisine attı").
    */
+  // Zaman Disi Fayda penceresi (ust cubuktaki buton) - kazanim sureci
+  // sayilari dis panoya buradan gider (bkz. BenefitsModal).
+  const [benefitsOpen, setBenefitsOpen] = useState(false);
+
   const saveTeamId =
     aktifSunum?.teamId ??
     (canSaveToTeam(teamIdForSelectedType) ? teamIdForSelectedType : null) ??
@@ -1309,6 +1314,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
               onToggleFinalized={canEdit && aktifSunum?.id ? handleToggleFinalized : null}
               finalized={!!aktifSunum?.finalizedAt}
               finalizing={finalizing}
+              onBenefits={canEdit && saveTeamId && tracksBenefits(sprintForm.teamType) ? () => setBenefitsOpen(true) : null}
             />
           ) : (
             <DashboardTopActions
@@ -1491,6 +1497,13 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
         onTabChange={setPreviewTab}
         renderCanvas={renderPreviewCanvas}
         timerSeconds={Number(timerMinutes) > 0 ? Number(timerMinutes) * 60 : null}
+      />
+
+      <BenefitsModal
+        open={benefitsOpen}
+        onClose={() => setBenefitsOpen(false)}
+        teamId={saveTeamId}
+        teamName={sprintForm.team}
       />
 
       <ExportPreviewModal

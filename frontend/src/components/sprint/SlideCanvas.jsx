@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import {
-  G, BAND, SEGCOL, bandBars, cardsTopFor, fitContent, parseRuns, sectionDefs, hasBenefitBand, BENEFIT_LEGEND_H,
+  G, BAND, SEGCOL, bandBars, cardsTopFor, fitContent, parseRuns, sectionDefs, hasBenefitBand,
   extractPriority, extractComment, PRIORITY_COLORS, PRIORITY_ORDER, PRIORITY_UNSET_LABEL, PRIORITY_UNSET_COLOR, hasPriorityTags, gapAt,
   segmentWidths,
 } from "../../lib/geometry";
@@ -62,22 +62,29 @@ function PriorityLegend() {
 }
 
 /**
- * Zaman disi fayda cubugunun RENK ACIKLAMASI - bandin hemen altinda, kucuk.
- * Cubuktaki renkler kategoriye sabit bagli oldugu icin (bkz. benefitTypes)
- * bu aciklama her sunumda ayni ve dogru olur.
+ * Zaman disi fayda cubugunun RENK ACIKLAMASI.
+ *
+ * Konum: slaytin SOL ALTINDA, "Gizli & Dahili Kullanim | Ekip" yazisinin
+ * yaninda - sagdaki oncelik aciklamasiyla ayni hizada ve ayni kucuklukte
+ * (kullanici istegi 2026-09-10). Onceden bandin hemen altindaydi ve icerik
+ * kartlarindan yer caliyordu; alt bilgi zaten bos oldugu icin orada hicbir
+ * seyden yer almiyor.
+ *
+ * Yalnizca cubuk DOLDURULMUSSA cizilir - bkz. hasBenefitBand.
  */
 function BenefitLegend() {
   return (
-    <div className="s-benefit-legend" style={{ top: (BAND.Y + BAND.H + 0.03) * S, height: BENEFIT_LEGEND_H * S }}>
+    <span className="s-legend s-benefit-legend">
       {BENEFIT_CATEGORIES.map((k) => (
         <span className="s-legend-item" key={k.key}>
           <i style={{ background: "#" + (SEGCOL[k.color] || "456BBA") }} />
           {k.label}
         </span>
       ))}
-    </div>
+    </span>
   );
 }
+
 function Card({ x, y, w, h, items, sec, fontSize, extraGap = 0 }) {
   return (
     // --item-gap: geometrinin madde araligi (gapAt) - eskiden CSS'te sabit
@@ -245,13 +252,13 @@ export default function SlideCanvas({ data, tab, assets, scale }) {
           />
         )}
         <Band bars={bars} />
-        {hasBenefitBand(data) && <BenefitLegend />}
         <Card x={G.X_L} y={cardsTop} w={G.COL_W} h={sol.topH} items={sections.done} sec={SEC.done} fontSize={fsByKey.done} extraGap={ekAralik.done} />
         <Card x={G.X_L} y={sol.yBot} w={G.COL_W} h={sol.botH} items={sections.risk} sec={SEC.risk} fontSize={fsByKey.risk} extraGap={ekAralik.risk} />
         <Card x={G.X_R} y={cardsTop} w={G.COL_W} h={sag.topH} items={sections.active} sec={SEC.active} fontSize={fsByKey.active} extraGap={ekAralik.active} />
         <Card x={G.X_R} y={sag.yBot} w={G.COL_W} h={sag.botH} items={sections.pending} sec={SEC.pending} fontSize={fsByKey.pending} extraGap={ekAralik.pending} />
         <div className="s-footer">
           Gizli &amp; Dahili Kullanım&nbsp;&nbsp;|&nbsp;&nbsp;{footerTeam}
+          {hasBenefitBand(data) && <BenefitLegend />}
           {hasPriorityTags(data) && <PriorityLegend />}
         </div>
       </>

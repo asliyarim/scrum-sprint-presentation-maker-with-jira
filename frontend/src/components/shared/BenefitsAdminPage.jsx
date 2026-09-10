@@ -6,20 +6,26 @@ import { IconUsers } from "./icons";
 import { fetchTeams, fetchTeamBenefits, saveTeamBenefits } from "../../lib/apiClient";
 import { DAV_COLORS } from "../../lib/format";
 import { teamTypeLabel } from "../../lib/teamTypes";
+import { BENEFIT_CATEGORIES } from "../../lib/benefitTypes";
 
 /**
- * Backend'deki BenefitType ile BIREBIR ayni key/label/sira (dis dashboard
- * sozlesmesi, Nezih 04.09.2026 bolum 3.3). Yalnizca finansal kazanimda
- * toplam deger + para birimi girilir.
+ * Backend'deki BenefitType ile BİREBİR aynı key/label/sıra. Yalnızca finansal
+ * kazanımda toplam değer + para birimi girilir.
+ *
+ * 2026-09-10'da altı kategori BEŞE indi (Pelinsu listesi) — bu bir yeniden
+ * adlandırma değil, birleşme: Hata Azaltma + Veri Kalitesi tek başlıkta,
+ * Çalışan + Müşteri Deneyimi tek başlıkta toplandı ve "Operasyonel
+ * Verimlilik" yeni eklendi. Mevcut kayıtlar V36 migration'ıyla taşındı;
+ * dış panonun (Nezih) da yeni key'lere geçmesi gerekiyor.
+ *
+ * Sıra ve renkler slayttaki çubukla aynı kaynaktan gelir (lib/benefitTypes.js)
+ * ki iki ekran birbirinden sapmasın.
  */
-export const BENEFIT_TYPES = [
-  { key: "financial", label: "Finansal Kazanç", hasValue: true },
-  { key: "errorReduction", label: "Hata Azaltma" },
-  { key: "riskControl", label: "Risk ve Kontrol" },
-  { key: "employeeExperience", label: "Çalışan Deneyimi" },
-  { key: "customerExperience", label: "Müşteri Deneyimi" },
-  { key: "dataQuality", label: "Veri Kalitesi" },
-];
+export const BENEFIT_TYPES = BENEFIT_CATEGORIES.map((k) => ({
+  key: k.key,
+  label: k.label,
+  hasValue: k.key === "finansalKazanim",
+}));
 
 const EMPTY_FORM = () =>
   Object.fromEntries(BENEFIT_TYPES.map((t) => [t.key, { processCount: "", value: "", currency: "TRY" }]));

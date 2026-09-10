@@ -20,7 +20,7 @@ import { IconUpload, IconDownload, IconSave, IconRefresh, IconJira, IconCheckCir
  */
 export default function SprintTopActions({
   onExcelFile, excelLoading, onGenerate, generating, onSave, saving, onUpdate, updating,
-  onJiraSync, jiraSyncing, onToggleFinalized, finalized, finalizing,
+  onJiraSync, jiraSyncing, onToggleFinalized, finalized, finalizing, onBenefits,
 }) {
   const fileInputRef = useRef(null);
 
@@ -54,6 +54,21 @@ export default function SprintTopActions({
         >
           <IconJira className="navbar-icon" />
           Jira'dan Çek
+        </Button>
+      )}
+      {/* "Zaman Dışı Fayda": kazanım süreç sayıları — dış kazanım panosunun
+          (Nezih) kaynağı. Önceden yalnızca admin ekranından giriliyordu; veriyi
+          bilen kişi takımın PO'su olduğu için sunumu hazırladığı yere alındı
+          (kullanıcı isteği 2026-09-10). Yalnızca kazanım tutan takımlarda
+          görünür — App.jsx null geçerse hiç çizilmez. */}
+      {onBenefits && (
+        <Button
+          variant="ghost"
+          onClick={onBenefits}
+          title="Kazanım sağlanan süreç sayılarını girin - dış kazanım panosu buradan beslenir"
+        >
+          <IconCheckCircle className="navbar-icon" />
+          Zaman Dışı Fayda
         </Button>
       )}
       {onSave && (

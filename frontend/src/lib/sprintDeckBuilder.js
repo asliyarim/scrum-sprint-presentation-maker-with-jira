@@ -1,5 +1,5 @@
 import {
-  G, SEGCOL, BAND, bandBars, fitContent, parseRuns, sectionDefs, gapAt, extractPriority, hasBenefitBand, BENEFIT_LEGEND_H,
+  G, SEGCOL, BAND, bandBars, fitContent, parseRuns, sectionDefs, gapAt, extractPriority, hasBenefitBand,
   extractComment, PRIORITY_COLORS, PRIORITY_ORDER, PRIORITY_UNSET_LABEL, PRIORITY_UNSET_COLOR, hasPriorityTags, logoPositions,
   segmentWidths,
 } from "./geometry";
@@ -114,28 +114,22 @@ export function addContentSlide(pptx, data, assets, theme = "light", cornerMesh 
         cx += w;
       });
     });
-    // ZAMAN DISI FAYDA renk aciklamasi - bandin hemen altinda, kucuk punto.
-    // Onizlemedeki BenefitLegend ile AYNI icerik ve AYNI konum; iki taraf da
-    // BENEFIT_CATEGORIES / BENEFIT_LEGEND_H'ten besleniyor ki birbirinden
-    // sapmasin (bkz. lib/benefitTypes.js).
-    if (hasBenefitBand(data)) {
-      const runs = BENEFIT_CATEGORIES.flatMap((k, i) => [
-        ...(i > 0 ? [{ text: "     ", options: {} }] : []),
-        { text: "\u25CF  ", options: { color: SEGCOL[k.color] || "456BBA", fontSize: 8 } },
-        { text: k.label, options: { color: "4B5563" } },
-      ]);
-      s2.addText(runs, {
-        x: BAND.X, y: BAND.Y + BAND.H + 0.03, w: BAND.W, h: BENEFIT_LEGEND_H,
-        fontFace: "Calibri", fontSize: 8.5, margin: 0, valign: "middle", align: "left",
-      });
-      return BAND.Y + BAND.H + 0.16 + BENEFIT_LEGEND_H;
-    }
     return BAND.Y + BAND.H + 0.16;
   }
 
   const footerTeam = (data.teamName || "Ekip").trim();
   s2.addShape(pptx.ShapeType.rect, { x: 0, y: 7.14, w: 13.333, h: 0.36, fill: { color: TEAL } });
-  s2.addText(`Gizli & Dahili Kullanım   |   ${footerTeam}`, { x: 0.4, y: 7.14, w: 7, h: 0.36, fontFace: "Calibri", fontSize: 10, color: "D6E4EA", margin: 0, valign: "middle" });
+    const footerRuns = [{ text: `Gizli & Dahili Kullanım   |   ${footerTeam}`, options: {} }];
+  // Zaman disi fayda renk aciklamasi ALT BILGIDE, takim adinin yaninda -
+  // onizlemedeki BenefitLegend ile ayni yer, ayni sira, ayni kucukluk.
+  if (hasBenefitBand(data)) {
+    BENEFIT_CATEGORIES.forEach((k) => {
+      footerRuns.push({ text: "     ", options: {} });
+      footerRuns.push({ text: "\u25CF ", options: { color: SEGCOL[k.color] || "456BBA", fontSize: 8 } });
+      footerRuns.push({ text: k.label, options: { fontSize: 8, color: "D6E4EA" } });
+    });
+  }
+  s2.addText(footerRuns, { x: 0.4, y: 7.14, w: hasBenefitBand(data) ? 9.6 : 7, h: 0.36, fontFace: "Calibri", fontSize: 10, color: "D6E4EA", margin: 0, valign: "middle" });
 
   if (hasPriorityTags(data)) {
     const legendEntries = [...PRIORITY_ORDER.map((p) => [p, PRIORITY_COLORS[p]]), [PRIORITY_UNSET_LABEL, PRIORITY_UNSET_COLOR]];
