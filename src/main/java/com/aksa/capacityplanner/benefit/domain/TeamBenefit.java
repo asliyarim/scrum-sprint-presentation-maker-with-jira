@@ -15,7 +15,7 @@ import java.time.Instant;
  * processCount: kazanim saglanan surec sayisi. null = BILINMIYOR (ekranda
  * "veri yok"), 0 = hic surec yok (ekranda 0). Bu ayrim dis sozlesmenin
  * acik kurali (bolum 3.4), o yuzden Integer (ilkel int degil).
- * value/currency: yalnizca FINANCIAL turunde anlamlidir.
+ * value/currency: yalnizca FINANSAL_KAZANIM turunde anlamlidir.
  */
 @Data
 @NoArgsConstructor

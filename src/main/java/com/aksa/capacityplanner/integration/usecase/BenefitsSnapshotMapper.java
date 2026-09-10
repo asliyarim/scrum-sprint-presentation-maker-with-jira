@@ -19,7 +19,8 @@ import java.util.Objects;
  *
  * Takimin kayitlari arasindan EN SON GUNCELLENEN donem secilir; o donemde
  * girilmemis turler processCount=null ile listede yine yer alir (ekranda
- * "veri yok"). Sira BenefitType bildirim sirasidir, hep 6 satir.
+ * "veri yok"). Sira BenefitType bildirim sirasidir, hep 5 satir
+ * (2026-09-10 oncesi 6 idi - bkz. BenefitType).
  */
 public final class BenefitsSnapshotMapper {
 

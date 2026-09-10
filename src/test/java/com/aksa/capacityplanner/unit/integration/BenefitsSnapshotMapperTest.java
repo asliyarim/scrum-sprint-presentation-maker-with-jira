@@ -22,12 +22,20 @@ class BenefitsSnapshotMapperTest {
     private static final Instant T1 = Instant.parse("2026-09-01T10:00:00Z");
     private static final Instant T2 = Instant.parse("2026-09-03T14:35:00Z");
 
+    /**
+     * Dis sozlesme: turler HER ZAMAN tam liste halinde, bildirim sirasinda
+     * doner - girilmemis olanlar processCount=null ile ("bilinmiyor").
+     *
+     * 2026-09-10'da tur sayisi ALTIDAN BESE indi ve key'ler degisti
+     * (bkz. BenefitType). Bu test o sozlesmeyi sabitler: key/label listesi
+     * degisirse Nezih'in panosu kirilacagi icin burasi da kirilmali.
+     */
     @Test
-    void returnsAllSixTypesInContractOrderWithNullForMissing() {
+    void returnsAllTypesInContractOrderWithNullForMissing() {
         List<TeamBenefit> rows = List.of(
-                row(BenefitType.FINANCIAL, "2026", 12, new BigDecimal("1250000"), null, T1),
-                row(BenefitType.ERROR_REDUCTION, "2026", 18, null, null, T2),
-                row(BenefitType.DATA_QUALITY, "2026", 0, null, null, T1));
+                row(BenefitType.FINANSAL_KAZANIM, "2026", 12, new BigDecimal("1250000"), null, T1),
+                row(BenefitType.KALITE_DOGRULUK_SUREKLILIK, "2026", 18, null, null, T2),
+                row(BenefitType.OPERASYONEL_VERIMLILIK, "2026", 0, null, null, T1));
 
         TeamBenefitsSnapshotDto dto = BenefitsSnapshotMapper.toSnapshot(RPA, rows);
 
@@ -36,31 +44,58 @@ class BenefitsSnapshotMapperTest {
         assertThat(dto.period()).isEqualTo("2026");
         assertThat(dto.lastUpdated()).isEqualTo(T2);
         assertThat(dto.benefits()).extracting(BenefitEntryDto::key).containsExactly(
-                "financial", "errorReduction", "riskControl", "employeeExperience", "customerExperience", "dataQuality");
+                "kaliteDogrulukSureklilik", "operasyonelVerimlilik", "riskUyumDenetim",
+                "calisanMusteriDeneyimi", "finansalKazanim");
         assertThat(dto.benefits()).extracting(BenefitEntryDto::label).containsExactly(
-                "Finansal Kazanç", "Hata Azaltma", "Risk ve Kontrol", "Çalışan Deneyimi", "Müşteri Deneyimi", "Veri Kalitesi");
+                "Kalite, Doğruluk ve Süreklilik", "Operasyonel Verimlilik", "Risk, Uyum ve Denetim",
+                "Çalışan ve Müşteri Deneyimi", "Finansal Kazanım");
 
-        BenefitEntryDto financial = dto.benefits().get(0);
+        assertThat(dto.benefits().get(0).processCount()).isEqualTo(18);
+        assertThat(dto.benefits().get(0).value()).isNull();
+        assertThat(dto.benefits().get(1).processCount()).isZero();   // 0 -> hic surec yok, null DEGIL
+        assertThat(dto.benefits().get(2).processCount()).isNull();   // girilmemis -> bilinmiyor
+        assertThat(dto.benefits().get(3).processCount()).isNull();
+
+        // Tutar/para birimi YALNIZCA finansal kazanimda tasinir.
+        BenefitEntryDto financial = dto.benefits().get(4);
         assertThat(financial.processCount()).isEqualTo(12);
         assertThat(financial.value()).isEqualByComparingTo("1250000");
         assertThat(financial.unit()).isEqualTo("TRY"); // para birimi bos -> varsayilan
+        assertThat(dto.benefits().get(0).unit()).isNull();
+    }
 
-        assertThat(dto.benefits().get(1).processCount()).isEqualTo(18);
-        assertThat(dto.benefits().get(1).value()).isNull();
-        assertThat(dto.benefits().get(2).processCount()).isNull();   // girilmemis -> bilinmiyor
-        assertThat(dto.benefits().get(5).processCount()).isZero();   // 0 -> hic surec yok, null DEGIL
+    /**
+     * Nezih'in panosu ve elde kalmis eski istekler bir sure daha ESKI
+     * key'leri gonderebilir - gecis suresince ikisi de calismali.
+     */
+    @Test
+    void eskiKeylerYeniTurlereCozulur() {
+        assertThat(BenefitType.fromKey("financial")).contains(BenefitType.FINANSAL_KAZANIM);
+        assertThat(BenefitType.fromKey("errorReduction")).contains(BenefitType.KALITE_DOGRULUK_SUREKLILIK);
+        assertThat(BenefitType.fromKey("dataQuality")).contains(BenefitType.KALITE_DOGRULUK_SUREKLILIK);
+        assertThat(BenefitType.fromKey("riskControl")).contains(BenefitType.RISK_UYUM_DENETIM);
+        assertThat(BenefitType.fromKey("employeeExperience")).contains(BenefitType.CALISAN_MUSTERI_DENEYIMI);
+        assertThat(BenefitType.fromKey("customerExperience")).contains(BenefitType.CALISAN_MUSTERI_DENEYIMI);
+        // Yeni key'ler de elbette calisir
+        assertThat(BenefitType.fromKey("operasyonelVerimlilik")).contains(BenefitType.OPERASYONEL_VERIMLILIK);
+        assertThat(BenefitType.fromKey("bilinmeyen")).isEmpty();
     }
 
     @Test
     void picksMostRecentlyUpdatedPeriod() {
         List<TeamBenefit> rows = List.of(
-                row(BenefitType.FINANCIAL, "2026-Q2", 5, null, null, T2),
-                row(BenefitType.FINANCIAL, "2026-Q3", 9, null, null, T1));
+                row(BenefitType.FINANSAL_KAZANIM, "2026-Q2", 5, null, null, T2),
+                row(BenefitType.FINANSAL_KAZANIM, "2026-Q3", 9, null, null, T1));
 
         TeamBenefitsSnapshotDto dto = BenefitsSnapshotMapper.toSnapshot(RPA, rows);
 
         assertThat(dto.period()).isEqualTo("2026-Q2"); // T2 daha yeni
-        assertThat(dto.benefits().get(0).processCount()).isEqualTo(5);
+        // Finansal kazanim bildirim sirasinda SONUNCU (bkz. BenefitType).
+        assertThat(dto.benefits())
+                .filteredOn(b -> "finansalKazanim".equals(b.key()))
+                .singleElement()
+                .extracting(BenefitEntryDto::processCount)
+                .isEqualTo(5);
     }
 
     @Test

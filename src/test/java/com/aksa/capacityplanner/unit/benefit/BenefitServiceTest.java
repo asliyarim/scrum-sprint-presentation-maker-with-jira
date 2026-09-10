@@ -54,33 +54,33 @@ class BenefitServiceTest {
     @Test
     void upsertCreatesThenUpdatesSameKeyWithoutTouchingOthers() {
         service.upsertPeriod(1L, " 2026 ", List.of(
-                entry(BenefitType.FINANCIAL, 12, new BigDecimal("1250000"), null),
-                entry(BenefitType.ERROR_REDUCTION, 18, null, null)), "40538");
+                entry(BenefitType.FINANSAL_KAZANIM, 12, new BigDecimal("1250000"), null),
+                entry(BenefitType.KALITE_DOGRULUK_SUREKLILIK, 18, null, null)), "40538");
         assertThat(repo.findAll()).hasSize(2);
 
         List<TeamBenefit> after = service.upsertPeriod(1L, "2026", List.of(
-                entry(BenefitType.FINANCIAL, 13, new BigDecimal("1300000"), "usd")), "40538");
+                entry(BenefitType.FINANSAL_KAZANIM, 13, new BigDecimal("1300000"), "usd")), "40538");
 
         assertThat(repo.findAll()).hasSize(2); // yeni satir ACILMADI, guncellendi
-        TeamBenefit financial = after.stream().filter(b -> b.getType() == BenefitType.FINANCIAL).findFirst().orElseThrow();
+        TeamBenefit financial = after.stream().filter(b -> b.getType() == BenefitType.FINANSAL_KAZANIM).findFirst().orElseThrow();
         assertThat(financial.getProcessCount()).isEqualTo(13);
         assertThat(financial.getValue()).isEqualByComparingTo("1300000");
         assertThat(financial.getCurrency()).isEqualTo("USD");
         assertThat(financial.getPeriod()).isEqualTo("2026"); // kirpildi
-        TeamBenefit error = after.stream().filter(b -> b.getType() == BenefitType.ERROR_REDUCTION).findFirst().orElseThrow();
+        TeamBenefit error = after.stream().filter(b -> b.getType() == BenefitType.KALITE_DOGRULUK_SUREKLILIK).findFirst().orElseThrow();
         assertThat(error.getProcessCount()).isEqualTo(18); // dokunulmadi
     }
 
     @Test
     void valueIsOnlyKeptForFinancialAndDefaultsCurrency() {
         List<TeamBenefit> saved = service.upsertPeriod(1L, "2026", List.of(
-                entry(BenefitType.RISK_CONTROL, 9, new BigDecimal("500"), "EUR"),
-                entry(BenefitType.FINANCIAL, 2, new BigDecimal("10"), null)), "x");
+                entry(BenefitType.RISK_UYUM_DENETIM, 9, new BigDecimal("500"), "EUR"),
+                entry(BenefitType.FINANSAL_KAZANIM, 2, new BigDecimal("10"), null)), "x");
 
-        TeamBenefit risk = saved.stream().filter(b -> b.getType() == BenefitType.RISK_CONTROL).findFirst().orElseThrow();
+        TeamBenefit risk = saved.stream().filter(b -> b.getType() == BenefitType.RISK_UYUM_DENETIM).findFirst().orElseThrow();
         assertThat(risk.getValue()).isNull();
         assertThat(risk.getCurrency()).isNull();
-        TeamBenefit fin = saved.stream().filter(b -> b.getType() == BenefitType.FINANCIAL).findFirst().orElseThrow();
+        TeamBenefit fin = saved.stream().filter(b -> b.getType() == BenefitType.FINANSAL_KAZANIM).findFirst().orElseThrow();
         assertThat(fin.getCurrency()).isEqualTo("TRY");
     }
 
@@ -88,9 +88,9 @@ class BenefitServiceTest {
     void rejectsInvalidInput() {
         assertThatThrownBy(() -> service.upsertPeriod(1L, "  ", List.of(), "x"))
                 .isInstanceOf(DomainValidationException.class);
-        assertThatThrownBy(() -> service.upsertPeriod(1L, "2026", List.of(entry(BenefitType.FINANCIAL, -1, null, null)), "x"))
+        assertThatThrownBy(() -> service.upsertPeriod(1L, "2026", List.of(entry(BenefitType.FINANSAL_KAZANIM, -1, null, null)), "x"))
                 .isInstanceOf(DomainValidationException.class);
-        assertThatThrownBy(() -> service.upsertPeriod(1L, "2026", List.of(entry(BenefitType.FINANCIAL, 1, BigDecimal.ONE, "lira")), "x"))
+        assertThatThrownBy(() -> service.upsertPeriod(1L, "2026", List.of(entry(BenefitType.FINANSAL_KAZANIM, 1, BigDecimal.ONE, "lira")), "x"))
                 .isInstanceOf(DomainValidationException.class);
         assertThatThrownBy(() -> service.upsertPeriod(1L, "2026", List.of(entry(null, 1, null, null)), "x"))
                 .isInstanceOf(DomainValidationException.class);
@@ -98,7 +98,7 @@ class BenefitServiceTest {
 
     @Test
     void nullProcessCountIsPreservedAsUnknown() {
-        List<TeamBenefit> saved = service.upsertPeriod(1L, "2026", List.of(entry(BenefitType.DATA_QUALITY, null, null, null)), "x");
+        List<TeamBenefit> saved = service.upsertPeriod(1L, "2026", List.of(entry(BenefitType.OPERASYONEL_VERIMLILIK, null, null, null)), "x");
         assertThat(saved.get(0).getProcessCount()).isNull();
     }
 
