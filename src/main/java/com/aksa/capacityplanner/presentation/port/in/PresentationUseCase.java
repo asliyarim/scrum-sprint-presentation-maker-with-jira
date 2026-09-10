@@ -1,5 +1,6 @@
 package com.aksa.capacityplanner.presentation.port.in;
 
+import com.aksa.capacityplanner.presentation.domain.PeriodGrouper;
 import com.aksa.capacityplanner.presentation.domain.PresentationDownloadLog;
 import com.aksa.capacityplanner.presentation.domain.PresentationVersion;
 import com.aksa.capacityplanner.presentation.domain.SprintPresentation;
@@ -66,4 +67,11 @@ public interface PresentationUseCase {
 
     /** Bir PPTX indirmesini (toplu/bireysel) denetim amacli kaydeder. */
     PresentationDownloadLog recordDownload(PresentationDownloadLog.DownloadType downloadType, List<Long> teamIds, String downloadedBy);
+
+    /**
+     * Tum takimlarin sunumlarini DONEMLERE ayirir - en yeni donem basta.
+     * Otomatik ortak sunumun temeli: Cagdas Bey'in hangi tarihte hangi
+     * ekiplerin hazir oldugunu tek ekranda gormesi icin.
+     */
+    List<PeriodGrouper.Donem> listPeriods();
 }

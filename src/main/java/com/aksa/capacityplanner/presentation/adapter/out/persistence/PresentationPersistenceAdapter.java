@@ -87,6 +87,24 @@ public class PresentationPersistenceAdapter implements PresentationRepositoryPor
         return latestByTeam.values().stream().map(this::toDomain).toList();
     }
 
+    @Override
+    public List<SprintPresentation> findAllForPeriodGrouping() {
+        return readOnlyJpaRepository.findPeriodRows().stream().map(this::toDomain).toList();
+    }
+
+    /**
+     * content BILEREK bos harita: bu yol donem ekranina yalnizca tarih ve
+     * durum bilgisi tasir, slaytlar okunmaz. createdAt de tasinmaz - gruplama
+     * ve "kim ne zaman guncelledi" icin updatedAt yeterli.
+     */
+    private SprintPresentation toDomain(SprintPresentationReadOnlyJpaRepository.PeriodRow row) {
+        return new SprintPresentation(row.getId(), row.getTeamId(), row.getSprintNo(), row.getDateRange(),
+                Map.of(), row.getCurrentVersion(), row.getUpdatedBy(),
+                null, row.getUpdatedAt(),
+                row.getFinalizedAt(), row.getFinalizedBy(),
+                row.getPeriodStart(), row.getPeriodEnd());
+    }
+
     private SprintPresentation toDomain(SprintPresentationReadOnlyJpaEntity entity) {
         return new SprintPresentation(entity.getId(), entity.getTeamId(), entity.getSprintNo(), entity.getDateRange(),
                 entity.getContent(), entity.getCurrentVersion(), entity.getUpdatedBy(),

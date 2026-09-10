@@ -1,12 +1,16 @@
 package com.aksa.capacityplanner.presentation.facade;
 
+import com.aksa.capacityplanner.presentation.domain.PeriodGrouper;
+import com.aksa.capacityplanner.presentation.domain.PeriodTeamOrder;
 import com.aksa.capacityplanner.presentation.domain.PresentationDownloadLog;
 import com.aksa.capacityplanner.presentation.domain.PresentationVersion;
 import com.aksa.capacityplanner.presentation.domain.SprintPresentation;
+import com.aksa.capacityplanner.presentation.port.in.PeriodOrderUseCase;
 import com.aksa.capacityplanner.presentation.port.in.PresentationUseCase;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -21,9 +25,11 @@ import java.util.Map;
 public class PresentationFacade {
 
     private final PresentationUseCase presentationUseCase;
+    private final PeriodOrderUseCase periodOrderUseCase;
 
-    public PresentationFacade(PresentationUseCase presentationUseCase) {
+    public PresentationFacade(PresentationUseCase presentationUseCase, PeriodOrderUseCase periodOrderUseCase) {
         this.presentationUseCase = presentationUseCase;
+        this.periodOrderUseCase = periodOrderUseCase;
     }
 
     public List<SprintPresentation> listByTeam(Long teamId) {
@@ -98,6 +104,31 @@ public class PresentationFacade {
         SprintPresentation presentation = presentationUseCase.getById(presentationId);
         requireEditAccess(presentation.getTeamId(), callerTeamIds, callerIsAdmin);
         return presentationUseCase.setFinalized(presentationId, finalized, callerSicil);
+    }
+
+    /**
+     * Donem listesi - okuma bu projede herkese acik (bkz. sinif aciklamasi),
+     * ayrica donen satirlar slayt icerigi tasimaz, yalnizca takim/sprint/tarih
+     * bilgisidir. Ekipler de kendi doneminde kimin hazir oldugunu gorebilmeli.
+     */
+    public List<PeriodGrouper.Donem> listPeriods() {
+        return presentationUseCase.listPeriods();
+    }
+
+    /** Kaydedilmis donem siralamalari - okuma herkese acik (bkz. listPeriods). */
+    public List<PeriodTeamOrder> listPeriodOrders() {
+        return periodOrderUseCase.listOrders();
+    }
+
+    /**
+     * Donemin takim sirasini yazar. Bu bir sunum icerigi degil, ortak sunumun
+     * SUNUS sirasidir; herkes degistirebilir ve en son degistiren gecerlidir
+     * (Gözde karari: "kim sıralama yaptıysa o şekilde sonlansın"). Bu yuzden
+     * takim bazli duzenleme yetkisi ARANMAZ - zaten kimsenin sunumu
+     * degismiyor. Kimin degistirdigi kayda gecer.
+     */
+    public PeriodTeamOrder setPeriodOrder(LocalDate periodEnd, List<Long> teamIds, String callerSicil) {
+        return periodOrderUseCase.setOrder(periodEnd, teamIds, callerSicil);
     }
 
     private void requireEditAccess(Long targetTeamId, List<Long> callerTeamIds, boolean callerIsAdmin) {

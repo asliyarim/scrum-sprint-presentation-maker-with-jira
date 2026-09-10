@@ -29,4 +29,12 @@ public interface PresentationRepositoryPort {
      * sunum ozelligi icin. sprint_presentations_readonly view'i uzerinden okur.
      */
     List<SprintPresentation> findLatestPerTeamReadOnly(List<Long> teamIds);
+
+    /**
+     * Donem gruplamasi icin TUM takimlarin sunumlari. Donen nesnelerin
+     * `content` alani BOS'tur - bu yol yalnizca tarih/donem bilgisi tasir,
+     * slayt icerigi okunmaz (bkz. SprintPresentationReadOnlyJpaRepository).
+     * Donem tarihi olmayan kayitlar hic donmez.
+     */
+    List<SprintPresentation> findAllForPeriodGrouping();
 }

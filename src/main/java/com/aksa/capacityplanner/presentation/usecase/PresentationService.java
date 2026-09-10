@@ -2,6 +2,7 @@ package com.aksa.capacityplanner.presentation.usecase;
 
 import com.aksa.capacityplanner.common.domain.ConflictException;
 import com.aksa.capacityplanner.common.domain.NotFoundException;
+import com.aksa.capacityplanner.presentation.domain.PeriodGrouper;
 import com.aksa.capacityplanner.presentation.domain.PresentationDownloadLog;
 import com.aksa.capacityplanner.presentation.domain.PresentationVersion;
 import com.aksa.capacityplanner.presentation.domain.SprintPresentation;
@@ -232,5 +233,11 @@ public class PresentationService implements PresentationUseCase {
     @Override
     public PresentationDownloadLog recordDownload(PresentationDownloadLog.DownloadType downloadType, List<Long> teamIds, String downloadedBy) {
         return downloadLogRepository.save(new PresentationDownloadLog(null, downloadType, teamIds, downloadedBy, null));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PeriodGrouper.Donem> listPeriods() {
+        return PeriodGrouper.grupla(presentationRepository.findAllForPeriodGrouping());
     }
 }

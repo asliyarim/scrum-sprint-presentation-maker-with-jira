@@ -59,6 +59,10 @@ class PresentationFinalizeTest {
         @Override public Optional<SprintPresentation> findByIdReadOnly(Long id) { return findById(id); }
         @Override public List<SprintPresentation> findByTeamIdReadOnly(Long teamId) { return findByTeamId(teamId); }
         @Override public List<SprintPresentation> findLatestPerTeamReadOnly(List<Long> teamIds) { return List.of(); }
+        /** Gercek adaptor gibi: donem tarihi olmayan kayitlari hic dondurmez. */
+        @Override public List<SprintPresentation> findAllForPeriodGrouping() {
+            return rows.stream().filter(r -> r.getPeriodEnd() != null).toList();
+        }
     }
 
     private static final class InMemoryVersions implements PresentationVersionRepositoryPort {

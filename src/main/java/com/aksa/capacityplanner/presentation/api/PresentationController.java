@@ -4,21 +4,30 @@ import com.aksa.capacityplanner.auth.domain.Role;
 import com.aksa.capacityplanner.auth.security.JwtTokenProvider;
 import com.aksa.capacityplanner.presentation.api.dto.PresentationDetailDto;
 import com.aksa.capacityplanner.presentation.api.dto.PresentationDownloadRequest;
+import com.aksa.capacityplanner.presentation.api.dto.PresentationPeriodDto;
+import com.aksa.capacityplanner.presentation.api.dto.PresentationPeriodOrderDto;
+import com.aksa.capacityplanner.presentation.api.dto.PresentationPeriodOrderRequest;
 import com.aksa.capacityplanner.presentation.api.dto.PresentationSummaryDto;
 import com.aksa.capacityplanner.presentation.api.dto.PresentationUpdateInPlaceRequest;
 import com.aksa.capacityplanner.presentation.api.dto.PresentationUpsertRequest;
 import com.aksa.capacityplanner.presentation.api.dto.PresentationVersionDetailDto;
 import com.aksa.capacityplanner.presentation.api.dto.PresentationVersionDto;
+import com.aksa.capacityplanner.presentation.domain.PeriodGrouper;
+import com.aksa.capacityplanner.presentation.domain.PeriodTeamOrder;
 import com.aksa.capacityplanner.presentation.domain.PresentationDownloadLog;
 import com.aksa.capacityplanner.presentation.domain.PresentationVersion;
 import com.aksa.capacityplanner.presentation.domain.SprintPresentation;
 import com.aksa.capacityplanner.presentation.facade.PresentationFacade;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/presentations")
@@ -131,6 +140,67 @@ public class PresentationController {
             throw new AccessDeniedException("Oturum bulunamadi.");
         }
         return claims;
+    }
+
+    /**
+     * Otomatik ortak sunum ekrani: sunumlari donemlere ayirip dondurur, en
+     * yeni donem basta. Okuma herkese acik (bkz. PresentationFacade sinif
+     * yorumu) ve donen satirlar slayt icerigi tasimaz.
+     */
+    @GetMapping("/periods")
+    public List<PresentationPeriodDto> listPeriods() {
+        // Siralamalar TEK sorguda okunup donemlere dagitiliyor - donem basina
+        // ayri sorgu atmak N+1 olurdu.
+        Map<LocalDate, PeriodTeamOrder> siralamalar = presentationFacade.listPeriodOrders().stream()
+                .collect(Collectors.toMap(PeriodTeamOrder::getPeriodEnd, o -> o, (a, b) -> a));
+        return presentationFacade.listPeriods().stream()
+                .map(d -> toPeriodDto(d, siralamalar.get(d.bitis())))
+                .toList();
+    }
+
+    /**
+     * Donemin takim sirasini yazar - ortak sunumdaki slayt sirasi. Donem
+     * basina tek kayit oldugundan bu bir UPSERT'tir: en son siralayan
+     * gecerlidir (Gözde karari 2026-09-09).
+     */
+    @PutMapping("/periods/{bitis}/order")
+    public PresentationPeriodOrderDto setPeriodOrder(
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate bitis,
+                                                      @Valid @RequestBody PresentationPeriodOrderRequest request,
+                                                      Authentication authentication) {
+        JwtTokenProvider.AccessTokenClaims claims = requireClaims(authentication);
+        PeriodTeamOrder kayit = presentationFacade.setPeriodOrder(bitis, request.teamIds(), claims.sicil());
+        return new PresentationPeriodOrderDto(kayit.getPeriodEnd(), kayit.getTeamIds(),
+                kayit.getUpdatedBy(), kayit.getUpdatedAt());
+    }
+
+    private PresentationPeriodDto toPeriodDto(PeriodGrouper.Donem donem, PeriodTeamOrder siralama) {
+        // SUNUS SIRASI: kaydedilmis bir siralama varsa o gecerlidir, yoksa
+        // sunumlarin dogal (tarih) sirasi. Bu sira hem asagidaki secilen
+        // listesine hem de sunumlar listesine ayni sekilde yansir - onizleme
+        // ve PPTX ayrica siralama yapmak zorunda kalmasin.
+        List<SprintPresentation> sirali = siralama == null
+                ? donem.sunumlar()
+                : PeriodTeamOrder.uygula(siralama.getTeamIds(), donem.sunumlar(), SprintPresentation::getTeamId);
+
+        List<Long> takimlar = sirali.stream().map(SprintPresentation::getTeamId).distinct().toList();
+        // Her takimdan ortak sunuma GIRECEK kayit - cakisma varsa en son
+        // guncellenen (bkz. Donem.takiminSunumu).
+        List<SprintPresentation> girecekler = takimlar.stream()
+                .map(donem::takiminSunumu)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        // "Hazir" sayisi SECILEN sunumlar uzerinden: bir takimin doneme dusen
+        // ikinci sunumu hazir olsa bile ortak sunuma girmeyecegi icin sayilmaz.
+        int hazir = (int) girecekler.stream().filter(SprintPresentation::isFinalized).count();
+
+        return new PresentationPeriodDto(donem.bitis(), donem.ilkBitis(), donem.sonBitis(),
+                donem.takimSayisi(), hazir,
+                donem.cakisanTakimlar(),
+                girecekler.stream().map(SprintPresentation::getId).toList(),
+                siralama == null ? null : siralama.getUpdatedBy(),
+                siralama == null ? null : siralama.getUpdatedAt(),
+                sirali.stream().map(this::toSummaryDto).toList());
     }
 
     private PresentationSummaryDto toSummaryDto(SprintPresentation p) {
