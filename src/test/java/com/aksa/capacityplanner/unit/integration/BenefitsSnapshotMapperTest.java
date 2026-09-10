@@ -65,20 +65,33 @@ class BenefitsSnapshotMapperTest {
     }
 
     /**
-     * Nezih'in panosu ve elde kalmis eski istekler bir sure daha ESKI
-     * key'leri gonderebilir - gecis suresince ikisi de calismali.
+     * Karsiligi KESIN olan eski key'ler yeni turlere cozulur - elde kalmis
+     * eski istekler bir sure daha calissin diye.
      */
     @Test
-    void eskiKeylerYeniTurlereCozulur() {
+    void karsiligiKesinEskiKeylerCozulur() {
         assertThat(BenefitType.fromKey("financial")).contains(BenefitType.FINANSAL_KAZANIM);
-        assertThat(BenefitType.fromKey("errorReduction")).contains(BenefitType.KALITE_DOGRULUK_SUREKLILIK);
-        assertThat(BenefitType.fromKey("dataQuality")).contains(BenefitType.KALITE_DOGRULUK_SUREKLILIK);
         assertThat(BenefitType.fromKey("riskControl")).contains(BenefitType.RISK_UYUM_DENETIM);
+        // Ikisi de ayni yeni ture birlesiyor - belirsizlik yok.
         assertThat(BenefitType.fromKey("employeeExperience")).contains(BenefitType.CALISAN_MUSTERI_DENEYIMI);
         assertThat(BenefitType.fromKey("customerExperience")).contains(BenefitType.CALISAN_MUSTERI_DENEYIMI);
         // Yeni key'ler de elbette calisir
         assertThat(BenefitType.fromKey("operasyonelVerimlilik")).contains(BenefitType.OPERASYONEL_VERIMLILIK);
         assertThat(BenefitType.fromKey("bilinmeyen")).isEmpty();
+    }
+
+    /**
+     * BELIRSIZ eski key'ler REDDEDILIR - sessizce yanlis kategoriye yazmasinlar.
+     *
+     * Uretim verisi (2026-09-10) errorReduction ile dataQuality'nin AYRI yeni
+     * kategorilere gittigini gosterdi (biri Kalite=20, digeri Operasyonel=23)
+     * ama hangisinin hangisi oldugu bilinmiyor. Tahmin etmek yerine cagirana
+     * hata donduruluyor.
+     */
+    @Test
+    void belirsizEskiKeylerReddedilir() {
+        assertThat(BenefitType.fromKey("errorReduction")).isEmpty();
+        assertThat(BenefitType.fromKey("dataQuality")).isEmpty();
     }
 
     @Test

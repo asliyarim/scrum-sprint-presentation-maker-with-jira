@@ -80,12 +80,20 @@ public enum BenefitType {
                 .findFirst();
     }
 
-    /** 2026-09-10 oncesi adlar - hem key hem enum adi bicimiyle. */
+    /**
+     * 2026-09-10 oncesi adlar - hem key hem enum adi bicimiyle.
+     *
+     * errorReduction ve dataQuality BILEREK YOK: bu ikisinin hangi yeni
+     * kategoriye karsilik geldigi belirsiz. Uretim verisi (2026-09-10)
+     * ikisinin AYRI kategorilere gittigini gosterdi - biri "Kalite, Dogruluk
+     * ve Sureklilik" (20), digeri "Operasyonel Verimlilik" (23) - ama
+     * hangisinin hangisi oldugu bilinmiyor. Tahminle esleyip sessizce yanlis
+     * kategoriye yazmaktansa acikca reddedilsinler; cagiran taraf hatayi
+     * gorup dogru key'i gonderir.
+     */
     private static Optional<BenefitType> eskiKeyden(String k) {
         return switch (k.toUpperCase(Locale.ROOT)) {
             case "FINANCIAL" -> Optional.of(FINANSAL_KAZANIM);
-            case "ERRORREDUCTION", "ERROR_REDUCTION", "DATAQUALITY", "DATA_QUALITY" ->
-                    Optional.of(KALITE_DOGRULUK_SUREKLILIK);
             case "RISKCONTROL", "RISK_CONTROL" -> Optional.of(RISK_UYUM_DENETIM);
             case "EMPLOYEEEXPERIENCE", "EMPLOYEE_EXPERIENCE", "CUSTOMEREXPERIENCE", "CUSTOMER_EXPERIENCE" ->
                     Optional.of(CALISAN_MUSTERI_DENEYIMI);

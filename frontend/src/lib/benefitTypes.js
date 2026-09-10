@@ -30,15 +30,19 @@ export const BENEFIT_BAR_LABEL = "ZAMAN DIŞI FAYDA";
 
 /**
  * Kategoriler — sıra ve renk SABİT. `color` değerleri geometry.SEGCOL
- * anahtarlarıdır; renkler kullanıcının paylaştığı tablodaki renklerle
- * eşleşecek şekilde seçildi (kalite sarı, operasyonel yeşil, risk kırmızı).
+ * anahtarlarıdır.
+ *
+ * RENKLER PELİNSU'NUN TABLOSUNDAN birebir alındı (2026-09-10): kalite sarı,
+ * operasyonel mavi, risk kırmızı, çalışan/müşteri mor, finansal yeşil.
+ * Önce tahmin edilmişti ve üçü yanlıştı; sunumda ekiplerin alışık olduğu
+ * renklerle aynı görünmesi için tabloya uyduruldu.
  */
 export const BENEFIT_CATEGORIES = [
   { key: "kaliteDogrulukSureklilik", label: "Kalite, Doğruluk ve Süreklilik", color: "amber" },
-  { key: "operasyonelVerimlilik", label: "Operasyonel Verimlilik", color: "green" },
+  { key: "operasyonelVerimlilik", label: "Operasyonel Verimlilik", color: "blue" },
   { key: "riskUyumDenetim", label: "Risk, Uyum ve Denetim", color: "red" },
-  { key: "calisanMusteriDeneyimi", label: "Çalışan ve Müşteri Deneyimi", color: "blue" },
-  { key: "finansalKazanim", label: "Finansal Kazanım", color: "purple" },
+  { key: "calisanMusteriDeneyimi", label: "Çalışan ve Müşteri Deneyimi", color: "purple" },
+  { key: "finansalKazanim", label: "Finansal Kazanım", color: "green" },
 ];
 
 /** Boş bir zaman dışı fayda çubuğu - segmentler kategorilerle birebir. */
