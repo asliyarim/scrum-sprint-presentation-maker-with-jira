@@ -5083,3 +5083,80 @@ header.topbar .btn:hover {
     justify-content: flex-end;
   }
 }
+
+/* ---------------------------------------------------------------------- */
+/* ZAMAN DISI FAYDA - sabit kategorili cubuk ve renk aciklamasi            */
+/* ---------------------------------------------------------------------- */
+/* Editordeki sabit satirlar: renk noktasi + kategori adi + sayi kutusu.
+   Normal segment satirindan farki, renk secici ve sil butonu olmamasi -
+   kategoriler ve renkler sabittir (bkz. lib/benefitTypes.js). */
+.benefit-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 7px 12px;
+}
+.benefit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.benefit-row-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.benefit-row input {
+  flex: none;
+  width: 74px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 700;
+}
+.bar-benefit-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: var(--teal);
+}
+.bandbtns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Slayttaki renk aciklamasi - bandin hemen altinda, kucuk. Oncelik
+   aciklamasiyla (.s-legend) ayni gorsel dil. */
+.s-benefit-legend {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 9px;
+  color: #4B5563;
+}
+.s-benefit-legend .s-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.s-benefit-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}

@@ -1,9 +1,10 @@
 import {
-  G, SEGCOL, BAND, bandBars, fitContent, parseRuns, sectionDefs, gapAt, extractPriority,
+  G, SEGCOL, BAND, bandBars, fitContent, parseRuns, sectionDefs, gapAt, extractPriority, hasBenefitBand, BENEFIT_LEGEND_H,
   extractComment, PRIORITY_COLORS, PRIORITY_ORDER, PRIORITY_UNSET_LABEL, PRIORITY_UNSET_COLOR, hasPriorityTags, logoPositions,
   segmentWidths,
 } from "./geometry";
 import { DEFAULT_CORNER_MESH } from "../assets/cornerMesh";
+import { BENEFIT_CATEGORIES } from "./benefitTypes";
 
 // Resim1 kose-mesh dekorasyonunun gercek en-boy orani (658x960 kaynak PNG) -
 // hangi boyutta cizilirse cizilsin bu oranla hesaplanir ki gorsel gerilmesin.
@@ -113,6 +114,22 @@ export function addContentSlide(pptx, data, assets, theme = "light", cornerMesh 
         cx += w;
       });
     });
+    // ZAMAN DISI FAYDA renk aciklamasi - bandin hemen altinda, kucuk punto.
+    // Onizlemedeki BenefitLegend ile AYNI icerik ve AYNI konum; iki taraf da
+    // BENEFIT_CATEGORIES / BENEFIT_LEGEND_H'ten besleniyor ki birbirinden
+    // sapmasin (bkz. lib/benefitTypes.js).
+    if (hasBenefitBand(data)) {
+      const runs = BENEFIT_CATEGORIES.flatMap((k, i) => [
+        ...(i > 0 ? [{ text: "     ", options: {} }] : []),
+        { text: "\u25CF  ", options: { color: SEGCOL[k.color] || "456BBA", fontSize: 8 } },
+        { text: k.label, options: { color: "4B5563" } },
+      ]);
+      s2.addText(runs, {
+        x: BAND.X, y: BAND.Y + BAND.H + 0.03, w: BAND.W, h: BENEFIT_LEGEND_H,
+        fontFace: "Calibri", fontSize: 8.5, margin: 0, valign: "middle", align: "left",
+      });
+      return BAND.Y + BAND.H + 0.16 + BENEFIT_LEGEND_H;
+    }
     return BAND.Y + BAND.H + 0.16;
   }
 

@@ -279,8 +279,21 @@ export function segmentWidths(segs, totalW, charW = 0.078, padding = 0.14) {
   return values.map((v, i) => mins[i] + (v / sum) * remaining);
 }
 
+/**
+ * Zaman disi fayda cubugunun renk aciklamasi icin bandin ALTINDA ayrilan
+ * yukseklik. Aciklama sadece o cubuk varken cizilir; yoksa kartlar eskisi
+ * gibi bandin hemen altindan baslar - baska hicbir sunum etkilenmez.
+ */
+export const BENEFIT_LEGEND_H = 0.24;
+
+/** Bandda zaman disi fayda cubugu var mi? (renk aciklamasi buna bagli) */
+export function hasBenefitBand(d) {
+  return bandBars(d).some((b) => b && b.kind === "benefit");
+}
+
 export function cardsTopFor(d) {
-  return bandBars(d).length ? BAND.Y + BAND.H + 0.16 : G.Y_TOP;
+  if (!bandBars(d).length) return G.Y_TOP;
+  return BAND.Y + BAND.H + 0.16 + (hasBenefitBand(d) ? BENEFIT_LEGEND_H : 0);
 }
 
 export function cardH(items, f) {

@@ -4,7 +4,7 @@ import SectionEditor from "./SectionEditor";
 import Button from "../shared/Button";
 import ErrorBanner from "../shared/ErrorBanner";
 import { IconRefresh } from "../shared/icons";
-import { hasFteTracking } from "../../lib/teamTypes";
+import { hasFteTracking, tracksBenefits } from "../../lib/teamTypes";
 
 const SECTION_TITLES_TR = {
   done: "İçerik — her satır bir madde",
@@ -45,7 +45,7 @@ export default function SprintPage({ form, band, excel, jira, teamId, jiraProjec
         </div>
       )}
       {excel.info && <div className="excelinfo" style={{ marginBottom: 10 }}>{excel.info}</div>}
-      <BandEditorPanel band={band} hasFte={hasFteTracking(form.teamType)} />
+      <BandEditorPanel band={band} hasFte={hasFteTracking(form.teamType)} showBenefit={tracksBenefits(form.teamType)} />
       <p className="panelttl">{SECTION_TITLES_TR.done}</p>
       {excel.error && <ErrorBanner error={excel.error} onDismiss={() => {}} />}
       {jira && (

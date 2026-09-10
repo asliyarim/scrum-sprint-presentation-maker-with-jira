@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { findBenefitBar, newBenefitBar } from "../lib/benefitTypes";
 
 // Hedefler bandinda gosterilebilecek azami cubuk sayisi - slaytta cok fazla
 // cubuk okunabilirligi bozar. Excel/Jira kaynagindan bu sayidan fazla cubuk
@@ -32,6 +33,27 @@ export function useBandEditor() {
     }
     setBars((prev) => [...prev, newBar()]);
   };
+
+  /**
+   * "Zaman Dışı Fayda" çubuğu - normal çubuklardan farkı, kategorilerinin ve
+   * renklerinin SABİT olması; PO yalnızca sayıları yazar (bkz. benefitTypes).
+   * Bir sunumda en fazla BİR tane olabilir: iki tane olsaydı dış panonun
+   * hangisini okuyacağı belirsiz kalırdı.
+   */
+  const addBenefitBar = () => {
+    if (findBenefitBar(bars)) {
+      setError("Zaman dışı fayda çubuğu zaten ekli - bir sunumda yalnızca bir tane olabilir.");
+      return;
+    }
+    if (bars.length >= MAX_BAND_BARS) {
+      setError(`Yer kalmadı. En fazla ${MAX_BAND_BARS} çubuk olabilir; önce çubuklardan birini silin.`);
+      return;
+    }
+    setShow(true);
+    setBars((prev) => [...prev, newBenefitBar()]);
+  };
+
+  const hasBenefitBar = !!findBenefitBar(bars);
   const removeBar = (index) => setBars((prev) => prev.filter((_, i) => i !== index));
   const updateBarLabel = (index, label) =>
     setBars((prev) => prev.map((b, i) => (i === index ? { ...b, label } : b)));
@@ -74,5 +96,6 @@ export function useBandEditor() {
   return {
     show, bars, toggleShow, addBar, removeBar, updateBarLabel, addSegment, removeSegment, updateSegment, setSample,
     error, clearError, pendingChoices, confirmChoices, cancelChoices,
+    addBenefitBar, hasBenefitBar,
   };
 }

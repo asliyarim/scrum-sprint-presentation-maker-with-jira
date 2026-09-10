@@ -20,6 +20,19 @@ export function hasFteTracking(teamType) {
 }
 
 /**
+ * "Zaman Dışı Fayda" çubuğu hangi takımlarda girilebilir?
+ *
+ * Şimdilik yalnızca RPA - kazanım kartı RPA Genel İşler ekranına özgü
+ * (dış pano gereksinim dokümanı bölüm 3; BenefitsSnapshotService.isBenefitTeam
+ * ile AYNI kural). Başka bir takım eklenecekse iki yer birlikte güncellenmeli.
+ */
+export const BENEFIT_TEAM_TYPES = ["RPA"];
+
+export function tracksBenefits(teamType) {
+  return BENEFIT_TEAM_TYPES.includes(teamType);
+}
+
+/**
  * Excel yuklendiginde Hedefler bandi OTOMATIK acilsin mi? Eskiden takim
  * ayrimi yoktu: Excel'in "Rapor" sayfasinda bant verisi bulunan HER takimda
  * bant kendiliginden aciliyor, digerleri de elle kapatmak zorunda kaliyordu

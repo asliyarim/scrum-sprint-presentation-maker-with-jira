@@ -1,10 +1,11 @@
 import { Fragment } from "react";
 import {
-  G, BAND, SEGCOL, bandBars, cardsTopFor, fitContent, parseRuns, sectionDefs,
+  G, BAND, SEGCOL, bandBars, cardsTopFor, fitContent, parseRuns, sectionDefs, hasBenefitBand, BENEFIT_LEGEND_H,
   extractPriority, extractComment, PRIORITY_COLORS, PRIORITY_ORDER, PRIORITY_UNSET_LABEL, PRIORITY_UNSET_COLOR, hasPriorityTags, gapAt,
   segmentWidths,
 } from "../../lib/geometry";
 import { DEFAULT_CORNER_MESH } from "../../assets/cornerMesh";
+import { BENEFIT_CATEGORIES } from "../../lib/benefitTypes";
 
 const S = 96; // px per inch - orijinal ile birebir ayni olcek
 // Resim1 sablon dekorasyonu - PPTX'teki (sprintDeckBuilder.js) AYNI inc
@@ -60,6 +61,23 @@ function PriorityLegend() {
   );
 }
 
+/**
+ * Zaman disi fayda cubugunun RENK ACIKLAMASI - bandin hemen altinda, kucuk.
+ * Cubuktaki renkler kategoriye sabit bagli oldugu icin (bkz. benefitTypes)
+ * bu aciklama her sunumda ayni ve dogru olur.
+ */
+function BenefitLegend() {
+  return (
+    <div className="s-benefit-legend" style={{ top: (BAND.Y + BAND.H + 0.03) * S, height: BENEFIT_LEGEND_H * S }}>
+      {BENEFIT_CATEGORIES.map((k) => (
+        <span className="s-legend-item" key={k.key}>
+          <i style={{ background: "#" + (SEGCOL[k.color] || "456BBA") }} />
+          {k.label}
+        </span>
+      ))}
+    </div>
+  );
+}
 function Card({ x, y, w, h, items, sec, fontSize, extraGap = 0 }) {
   return (
     // --item-gap: geometrinin madde araligi (gapAt) - eskiden CSS'te sabit
@@ -227,6 +245,7 @@ export default function SlideCanvas({ data, tab, assets, scale }) {
           />
         )}
         <Band bars={bars} />
+        {hasBenefitBand(data) && <BenefitLegend />}
         <Card x={G.X_L} y={cardsTop} w={G.COL_W} h={sol.topH} items={sections.done} sec={SEC.done} fontSize={fsByKey.done} extraGap={ekAralik.done} />
         <Card x={G.X_L} y={sol.yBot} w={G.COL_W} h={sol.botH} items={sections.risk} sec={SEC.risk} fontSize={fsByKey.risk} extraGap={ekAralik.risk} />
         <Card x={G.X_R} y={cardsTop} w={G.COL_W} h={sag.topH} items={sections.active} sec={SEC.active} fontSize={fsByKey.active} extraGap={ekAralik.active} />
