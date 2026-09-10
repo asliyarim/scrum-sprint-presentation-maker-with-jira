@@ -5,11 +5,12 @@ import Button from "./Button";
 import ZoomModal from "./ZoomModal";
 import PresentationRunnerModal from "./PresentationRunnerModal";
 import PptxTemplateModal from "./PptxTemplateModal";
+import PeriodPanel from "./PeriodPanel";
 import SlideCanvas from "../sprint/SlideCanvas";
 import DashboardSlideCanvas from "../dashboard/DashboardSlideCanvas";
 import VelocityBurndownSlideCanvas from "../sprint/VelocityBurndownSlideCanvas";
 import { IconUsers, IconCheckCircle, IconLayers, IconDownload } from "./icons";
-import { fetchTeams, fetchPresentations, fetchLatestPresentationsByTeams, fetchPresentationVersions, fetchPresentationVersion, recordPresentationDownload, saveJointPresentation } from "../../lib/apiClient";
+import { fetchTeams, fetchPresentations, fetchLatestPresentationsByTeams, fetchPresentationVersions, fetchPresentationVersion, recordPresentationDownload, saveJointPresentation, savePeriodOrder } from "../../lib/apiClient";
 import { sprintDataFromContent } from "../../lib/presentationContent";
 import { toSavablePicks } from "../../lib/jointPicks";
 import { sortBySprintNo } from "../../lib/sprintNumbers";
@@ -122,6 +123,9 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
   // Secilenler: { presentationId, teamId, sprintNo, version }. Ayni sunumun
   // FARKLI surumleri de ayri ayri secilebilir, o yuzden anahtar presId+version.
   const [picks, setPicks] = useState([]);
+  // Secim bir DONEMDEN geldiyse o donemin tarihi - siralama degistiginde
+  // hangi doneme kaydedilecegini bilmek icin (bkz. reorderPicks).
+  const [secilenDonem, setSecilenDonem] = useState(null);
   const [allLoading, setAllLoading] = useState(false);
   // Secilenler listesinde surukle-birak ile yeniden siralama - o an suruklenen
   // ogenin picks icindeki indeksi. Ortak sunum takim sirasi picks sirasindan
@@ -236,19 +240,56 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
     }
   };
 
-  const clearPicks = () => setPicks([]);
+  /**
+   * "Bu dönemi seç": bir dönemin sunumlarını tek hamlede seçime doldurur.
+   * selectAllLatest'in dönem karşılığı — farkı, "her takımın en son sprinti"
+   * yerine "bu döneme ait sunum" olması. Aynı takım o döneme iki sunum
+   * bırakmışsa yalnızca backend'in seçtiği (en son güncellenen) girer;
+   * hangisi olduğu secilenSunumIdler ile gelir.
+   *
+   * Sıra takım listesi sırasıdır - PO sonra sürükleyerek değiştirebilir
+   * (bkz. reorderPicks).
+   */
+  const selectPeriod = (donem) => {
+    // Sunumlar backend'den ZATEN sunus sirasinda geliyor (kaydedilmis
+    // siralama varsa o uygulanmis olur, bkz. PresentationController.toPeriodDto);
+    // secilenSunumIdler de ayni sirada. Burada yeniden siralamiyoruz -
+    // siralayacak olsak kaydedilmis sirayi ezerdik.
+    const sunumlar = new Map(donem.sunumlar.map((s) => [s.id, s]));
+    const sirali = (donem.secilenSunumIdler || []).map((id) => sunumlar.get(id)).filter(Boolean);
+    setPicks(sirali.map((s) => ({
+      presentationId: s.id, teamId: s.teamId, sprintNo: s.sprintNo, version: s.currentVersion,
+    })));
+    setSecilenDonem(donem.bitis);
+    setResults(null);
+    setError(null);
+  };
+
+  const clearPicks = () => { setPicks([]); setSecilenDonem(null); };
   const removePick = (presId, version) =>
     setPicks((prev) => prev.filter((x) => !(x.presentationId === presId && x.version === version)));
 
   // Surukle-birak: from indeksindeki secimi to indeksine tasir.
+  //
+  // Bir DONEM secilerek gelindiyse (bkz. selectPeriod) yeni sira o doneme
+  // KAYDEDILIR - Gözde'nin 4. maddesi: "sıralamayı biz manuel yapabilir
+  // miyiz... kim sıralama yaptıysa o şekilde sonlansın". Boylece Cagdas Bey
+  // ekrani actiginda otomatik ortak sunum da bu sirayla gelir. Kayit
+  // basarisiz olursa ekrandaki sira yine degisir, sadece kalici olmaz -
+  // siralama kritik bir veri degil, kullaniciyi bloklamaya degmez.
   const reorderPicks = (from, to) => {
-    setPicks((prev) => {
-      if (from == null || to == null || from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+    if (from == null || to == null || from === to || from < 0 || to < 0
+        || from >= picks.length || to >= picks.length) return;
+    const next = [...picks];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setPicks(next);
+    // Kayit setPicks guncelleyicisinin ICINDE yapilmaz: React o fonksiyonu
+    // birden fazla kez calistirabilir (StrictMode) ve ayni PUT iki kez
+    // giderdi. Yan etki burada, guncelleyicinin disinda.
+    if (secilenDonem) {
+      savePeriodOrder(secilenDonem, [...new Set(next.map((p) => p.teamId))]).catch(() => {});
+    }
   };
   const teamNameOf = (teamId) => teams.find((t) => t.id === teamId)?.name || "Takım";
 
@@ -440,6 +481,11 @@ export default function JointPresentationPage({ personnel, theme, onToggleTheme 
             </div>
           </div>
         </div>
+
+        {/* Dönem paneli takım listesinin ÜSTÜNDE: Çağdaş Bey'in olağan yolu
+            "tarihi seç, gerisi dolsun" olmalı; takım takım tek tek seçim
+            artık istisnai durum için (bkz. PeriodPanel). */}
+        <PeriodPanel teams={teams} onSelectPeriod={selectPeriod} busy={loading || allLoading} />
 
         <div className="bandpanel joint-filter-panel" style={{ marginBottom: 16 }}>
           <div className="bandtoggle joint-filter-title" style={{ cursor: "default" }}>

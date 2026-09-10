@@ -345,6 +345,38 @@ export async function fetchLatestPresentationsByTeams(teamIds) {
   return requestJson(`/api/presentations/latest?teamIds=${teamIds.join(",")}`);
 }
 
+/**
+ * Sunumları DÖNEMLERE ayrılmış halde döner (en yeni dönem başta) — otomatik
+ * ortak sunumun temeli. Her dönem şunları taşır:
+ *   bitis              dönemin bitiş tarihi (ISO)
+ *   takimSayisi        o dönemde sunumu olan AYRI takım sayısı
+ *   hazirTakimSayisi   "sunumum hazır" işaretli takım sayısı
+ *   cakisanTakimlar    aynı döneme iki sunum bırakmış takımların id'leri
+ *   secilenSunumIdler  her takımdan ortak sunuma girecek sunumun id'si
+ *   sunumlar           döneme düşen tüm sunumlar (çakışanlar dahil)
+ *
+ * Kaç takımın sunum yapması GEREKTİĞİ burada yok — "X/8 hazır" oranını ekran
+ * kendi bildiği takım listesiyle hesaplar (bkz. backend PresentationPeriodDto).
+ */
+export async function fetchPresentationPeriods() {
+  return requestJson("/api/presentations/periods");
+}
+
+/**
+ * Bir dönemin takım SIRASINI kaydeder — ortak sunumdaki slayt sırası.
+ *
+ * Dönem başına TEK kayıt vardır, yani bu bir üzerine yazmadır: en son
+ * sıralayan geçerlidir (Gözde kararı 2026-09-09 — "kim sıralama yaptıysa
+ * o şekilde sonlansın"). `bitis` dönemin ISO tarihidir (fetchPresentationPeriods
+ * içindeki `bitis` alanı), `teamIds` ise takım id'lerinin sıralı listesi.
+ */
+export async function savePeriodOrder(bitis, teamIds) {
+  return requestJson(`/api/presentations/periods/${bitis}/order`, {
+    method: "PUT",
+    body: JSON.stringify({ teamIds }),
+  });
+}
+
 /** Bir PPTX indirmesini (toplu/bireysel) denetim amaçlı kaydeder — bkz. backend PresentationDownloadLog. */
 export async function recordPresentationDownload(downloadType, teamIds) {
   return requestJson("/api/presentations/downloads", {

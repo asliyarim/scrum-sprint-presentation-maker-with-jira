@@ -1378,7 +1378,7 @@ function MainApp({ theme, toggleTheme, personnel, presentationId, newForTeamId, 
               teamType={sprintForm.teamType} setTeamType={handleTeamTypeChange}
               readOnlyView={readOnlyView}
               sprint={sprintForm.sprint} setSprint={sprintForm.setSprint}
-              range={sprintForm.range} setRange={sprintForm.setRange}
+              range={sprintForm.range}
               periodStart={donem.start} periodEnd={donem.end} onPeriodChange={handlePeriodChange}
               cover={cover}
               coverBackground={coverBackground}

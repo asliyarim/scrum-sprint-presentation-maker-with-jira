@@ -497,12 +497,22 @@
    tutarsiz oldugundan (icindeki icon-select'e max-width vermek tek basina
    yetmiyordu), sarmalayici .field kutularina DOGRUDAN sabit flex-basis
    veriliyor - genislik artik cocuklarin icerigine degil bu degerlere bagli. */
+/* SATIR ARTIK SARIYOR (2026-09-09): tarih araligi tek serbest metin kutusuyken
+   dort alan tek satira siğiyordu. Takvimden secim gelince alan sayisi bese
+   cikti ve input[type=date]'in kucultulemeyen dogal genisligi yuzunden satir
+   ~1020px'e ihtiyac duymaya basladi; sihirbazin sol sutunu ise 1440px ekranda
+   ~640px. Fark .meta'nin overflow:hidden'i tarafindan SESSIZCE kirpiliyordu,
+   yani "Sunum süresi" alani hic gorunmuyordu (kullanici bildirimi). nowrap
+   yerine wrap: dar sutunda alanlar ikinci satira iner, genis ekranda gorunum
+   eskisi gibi tek satir kalir. min-height sabit degil taban degeri oldugundan
+   iki satirda kutu kendiliginden uzar. */
 .meta {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   min-height: 130px;
   padding-top: 28px;
   padding-bottom: 28px;
   align-items: center;
+  align-content: center;
 }
 .meta select,
 .meta input {
@@ -525,14 +535,23 @@
   flex-direction: column;
   justify-content: center;
 }
-.meta > .field:nth-child(1) {
-  flex: 0 0 240px;
+/* Her alan ACIK bir flex-basis alir - genislik cocuklarin (ozellikle
+   input[type=date]'in tarayiciya gore degisen) dogal genisligine BAGLI
+   KALMAZ. min-width:0 sart: onsuz flex ogesi kendi min-content'inin altina
+   inemez ve satir yine tasar. */
+.meta > .field {
+  flex: 1 1 168px;
   min-width: 0;
+}
+.meta > .field:nth-child(1) {
+  flex: 0 1 240px;
 }
 .meta > .field:nth-child(2) {
-  flex: 0 0 130px;
-  min-width: 0;
+  flex: 0 1 130px;
 }
+/* .field.grow su an kullanilmiyor ("Slaytta görünecek" kutusu kaldirildi,
+   metin artik kutunun altindaki ipucu satirinda) - ileride genis bir alan
+   gerekirse diye kural duruyor. */
 .meta > .field.grow {
   flex: 1 1 auto;
   min-width: 180px;
@@ -4781,4 +4800,142 @@ header.topbar .btn:hover {
   color: #fff;
   background: var(--aksa-red, #d9534f);
   border-color: var(--aksa-red, #d9534f);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Donem paneli (bkz. PeriodPanel) - otomatik ortak sunumun ekran karsiligi */
+/* ---------------------------------------------------------------------- */
+.donem-listesi {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.donem-karti {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+}
+/* Tum ekipler sunum yuklediyse kart belirginlesir - Cagdas Bey'in aradigi
+   satir bu, listede one ciksin. */
+.donem-karti-tam {
+  border-color: var(--aksa-green);
+  box-shadow: 0 0 0 1px rgba(141, 198, 63, 0.25);
+}
+.donem-ust {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.donem-tarih {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--ink);
+}
+.donem-tarih-not {
+  font-size: 12px;
+  color: var(--mut);
+  font-weight: 500;
+}
+.donem-olcum {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.donem-rozet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--mut);
+}
+.donem-rozet-yesil {
+  color: var(--aksa-green-dark);
+}
+.donem-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.donem-bar-dolu {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--aksa-blue), var(--aksa-blue-light));
+  transition: width 0.25s ease;
+}
+.donem-takimlar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.donem-cip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--mut);
+  background: var(--card);
+  white-space: nowrap;
+}
+/* "Hazir" isaretli ekip - ortak sunuma girmeye hazir demek (bkz. V33). */
+.donem-cip-hazir {
+  color: var(--aksa-green-dark);
+  border-color: var(--aksa-green);
+  background: rgba(141, 198, 63, 0.12);
+}
+/* O donemde HIC sunumu olmayan ekip - eksigi gormek, olani gormek kadar
+   onemli (Gözde: "tüm ekipler sunum yapmak zorunda"). */
+.donem-cip-eksik {
+  color: var(--mut);
+  border-style: dashed;
+  opacity: 0.7;
+}
+.donem-uyari {
+  margin-top: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #8a5a00;
+  background: rgba(224, 118, 31, 0.10);
+  border: 1px solid rgba(224, 118, 31, 0.35);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.theme-dark .donem-uyari {
+  color: #f0c27a;
+}
+
+/* Otomatik olusan ortak sunum satirinin rozeti (bkz. JointPresentationListPanel).
+   Kaydedilmis sunumlardan ayirt edilmesi onemli: bunlar bir KAYIT degil,
+   donemden hesaplanan canli birlesimlerdir - silinemezler ve ekipler revize
+   ettikce kendiliginden guncellenirler. */
+.otomatik-rozet {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--aksa-green-dark);
+  background: rgba(141, 198, 63, 0.14);
+  border: 1px solid var(--aksa-green);
+}
+
+/* Donem kartinda "sirayi en son kim duzenledi" notu (bkz. PeriodPanel). */
+.donem-siralama-notu {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--mut);
 }

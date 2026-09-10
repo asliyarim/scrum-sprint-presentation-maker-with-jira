@@ -30,8 +30,10 @@ export default function CoverPage({
   setTeamType,
   sprint,
   setSprint,
+  // `range` slaytta görünecek METİN - artık burada elle DEĞİŞTİRİLMEZ,
+  // periodStart/periodEnd'den türetilir (bkz. App.jsx handlePeriodChange).
+  // Bu yüzden setRange prop'u kaldırıldı; sadece okunuyor.
   range,
-  setRange,
   periodStart,
   periodEnd,
   onPeriodChange,
@@ -109,15 +111,12 @@ export default function CoverPage({
                 />
               </div>
             </div>
-            {range && (
-              <div className="field grow">
-                <label>Slaytta görünecek</label>
-                <div className="icon-field">
-                  <IconCalendar className="icon-field-icon" style={{ width: 14, height: 14 }} />
-                  <input value={range} readOnly tabIndex={-1} style={{ opacity: 0.75 }} />
-                </div>
-              </div>
-            )}
+            {/* "Slaytta görünecek" AYRI BİR KUTU DEĞİL: iki takvim alanı
+                eklenince satır altı alana çıkmıştı, metin kırpılıyor ve
+                "Sunum süresi" satırdan taşıyordu (kullanıcı bildirimi
+                2026-09-09). Üretilen metin zaten sağdaki canlı önizlemede
+                slaytın altyazısı olarak aynen görünüyor; burada sadece
+                kutunun altında küçük bir teyit satırı bırakıldı. */}
             <div className="field">
               <label>Sunum süresi (dakika)</label>
               <div className="icon-field">
@@ -135,6 +134,12 @@ export default function CoverPage({
 
       {canEdit && (
         <div className="hint" style={{ marginTop: 8 }}>
+          {range && (
+            <>
+              Slaytta <b>{range}</b> olarak görünecek — tarihleri değiştirdiğinizde bu metin de kendiliğinden güncellenir.
+              <br />
+            </>
+          )}
           Sunum süresi kaydetmek için zorunludur - önizleme açıldığında bu süre geri sayım olarak başlar. Dilediğiniz zaman tekrar değiştirip kaydedebilirsiniz.
         </div>
       )}

@@ -9,8 +9,9 @@ import DashboardSlideCanvas from "../dashboard/DashboardSlideCanvas";
 import VelocityBurndownSlideCanvas from "../sprint/VelocityBurndownSlideCanvas";
 import { useCanvasFit } from "../../hooks/useCanvasFit";
 import { IconDownload, IconTrash, IconCalendar, IconLayers } from "./icons";
-import { fetchJointPresentations, deleteJointPresentation, recordPresentationDownload } from "../../lib/apiClient";
+import { fetchJointPresentations, deleteJointPresentation, recordPresentationDownload, fetchPresentationPeriods } from "../../lib/apiClient";
 import { loadJointResults } from "../../lib/jointPicks";
+import { isoToTr } from "../../lib/sprintPeriod";
 import { buildJointDeck, commonEndDate, JOINT_COVER_TITLE, JOINT_COVER_SUBTITLE } from "../../lib/jointDeckBuilder";
 import { hasVelocityContent } from "../../lib/velocityDeckBuilder";
 import { ASSETS } from "../../assets/pptxAssets";
@@ -41,6 +42,56 @@ function safeFileName(s) {
  */
 function takimSayisi(picks) {
   return new Set((picks || []).map((p) => p.teamId)).size;
+}
+
+/**
+ * OTOMATIK ORTAK SUNUM - Çağdaş Bey'in asıl isteği: "ekiplerin sunumları son
+ * hale geldiğinde bir tetikleme olmalı ve tüm ekipler tamamladığında ancak
+ * admin ekranında birleşmiş hali otomatik gelmelidir."
+ *
+ * Bir dönemi hazır birleşmiş sunuma çevirir — AMA yalnızca tüm ekipler hem
+ * sunumunu yüklediyse hem de "hazır" işaretlediyse. Eksik dönem bu listede
+ * hiç görünmez; o, Dönemler panelinde "6/8" olarak durur.
+ *
+ * DONDURULMUŞ KAYIT DEĞİL: picks her açılışta o anki `currentVersion` ile
+ * kurulur, yani bir ekip revize ederse birleşmiş sunum kendiliğinden yeni
+ * içeriği gösterir (Gözde'nin 3. maddesi — "otomatik güncellensin, Çağdaş Bey
+ * sürekli hangisi yeni versiyon diye aramak zorunda kalmasın"). Kaydedilmiş
+ * ortak sunumlar ise bilerek dondurulmuş kalır; o bilinçli bir arşivdir.
+ */
+function donemdenOtomatikSunum(donem, teams) {
+  const tamam = teams.length > 0
+    && donem.takimSayisi === teams.length
+    && donem.hazirTakimSayisi === teams.length;
+  if (!tamam) return null;
+
+  // SIRA BACKEND'DEN GELIR: secilenSunumIdler zaten sunus sirasindadir -
+  // o doneme kaydedilmis bir siralama varsa uygulanmis olur (bkz.
+  // PresentationController.toPeriodDto). Burada yeniden siralamak, birinin
+  // elle yaptigi sirayi ezerdi.
+  const sunumlar = new Map(donem.sunumlar.map((s) => [s.id, s]));
+  const picks = (donem.secilenSunumIdler || [])
+    .map((id) => sunumlar.get(id))
+    .filter(Boolean)
+    .map((s) => ({
+      presentationId: s.id,
+      version: s.currentVersion,
+      teamId: s.teamId,
+      teamName: teams.find((t) => t.id === s.teamId)?.name || "Takım",
+      sprintNo: s.sprintNo,
+      dateRange: s.dateRange || "",
+    }));
+  if (picks.length === 0) return null;
+
+  return {
+    id: `otomatik:${donem.bitis}`,
+    title: `${isoToTr(donem.bitis)} Dönemi`,
+    picks,
+    createdBy: null,
+    createdAt: null,
+    otomatik: true,
+    donem,
+  };
 }
 
 /**
@@ -148,27 +199,46 @@ export default function JointPresentationListPanel({ teams, theme }) {
   const [previewKey, setPreviewKey] = useState("__cover__");
   const [zoomOpen, setZoomOpen] = useState(false);
 
+  // Otomatik birlesen donemler - kaydedilmis sunumlardan AYRI kaynak.
+  // Yuklenemezse liste yine calisir, sadece otomatikler gorunmez; kayitli
+  // sunumlar hicbir sekilde etkilenmesin.
+  const [periods, setPeriods] = useState([]);
+
   const reload = () => {
     fetchJointPresentations()
       .then(setItems)
       .catch((err) => setError(err?.message || "Ortak sunumlar yüklenemedi."));
+    fetchPresentationPeriods()
+      .then(setPeriods)
+      .catch(() => setPeriods([]));
   };
 
   useEffect(reload, []);
 
+  const otomatikler = useMemo(
+    () => (periods || []).map((d) => donemdenOtomatikSunum(d, teams || [])).filter(Boolean),
+    [periods, teams],
+  );
+
+  // Otomatikler USTTE: Cagdas Bey ekrani acinca aradigi sey ilk sirada olsun.
+  const satirlar = useMemo(
+    () => (items === null ? null : [...otomatikler, ...items]),
+    [items, otomatikler],
+  );
+
   // Liste gelince ilk kayit otomatik secilir (silme sonrasi secili kayit
   // listeden dustuyse de yenisine gecilir) - takim panelindeki davranisin ayni.
   useEffect(() => {
-    if (items && items.length > 0 && !items.some((x) => x.id === selectedId)) {
-      setSelectedId(items[0].id);
-    } else if (items && items.length === 0) {
+    if (satirlar && satirlar.length > 0 && !satirlar.some((x) => x.id === selectedId)) {
+      setSelectedId(satirlar[0].id);
+    } else if (satirlar && satirlar.length === 0) {
       setSelectedId(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
+  }, [satirlar]);
 
   useEffect(() => {
-    const item = items?.find((x) => x.id === selectedId);
+    const item = satirlar?.find((x) => x.id === selectedId);
     if (!item) {
       setPreviewResults(null);
       return;
@@ -183,7 +253,7 @@ export default function JointPresentationListPanel({ teams, theme }) {
       .finally(() => { if (!iptal) setPreviewLoading(false); });
     return () => { iptal = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, items, teams]);
+  }, [selectedId, satirlar, teams]);
 
   const slides = useMemo(() => (previewResults ? slaytlariCikar(previewResults) : []), [previewResults]);
 
@@ -258,11 +328,11 @@ export default function JointPresentationListPanel({ teams, theme }) {
    * indirilsin mi?" diye sorabilir.
    */
   const handleDownloadAll = async (cornerMesh) => {
-    if (!items || items.length === 0) return;
+    if (!satirlar || satirlar.length === 0) return;
     setDownloadingAll(true);
     setError(null);
     const hatalar = [];
-    for (const item of items) {
+    for (const item of satirlar) {
       try {
         await buildAndSave(item, cornerMesh);
       } catch (err) {
@@ -308,7 +378,7 @@ export default function JointPresentationListPanel({ teams, theme }) {
               variant="soft"
               loading={downloadingAll}
               loadingLabel="Hazırlanıyor…"
-              disabled={!items || items.length === 0}
+              disabled={!satirlar || satirlar.length === 0}
               onClick={() => setPptxRequest({ type: "all" })}
             >
               <IconDownload style={{ width: 15, height: 15 }} />
@@ -321,17 +391,18 @@ export default function JointPresentationListPanel({ teams, theme }) {
         </div>
 
         {error && <div className="login-error" style={{ margin: "0 0 12px" }}>{error}</div>}
-        {items === null && !error && <div className="presentation-list-empty">Yükleniyor…</div>}
-        {items && items.length === 0 && (
+        {satirlar === null && !error && <div className="presentation-list-empty">Yükleniyor…</div>}
+        {satirlar && satirlar.length === 0 && (
           <div className="presentation-list-empty">
             <IconLayers style={{ width: 28, height: 28, opacity: 0.5 }} />
-            Henüz kaydedilmiş ortak sunum yok. &quot;+ Yeni Ortak Sunum&quot; ile takımları seçip
-            <b>&nbsp;Ortak Sunumu Kaydet</b> dediğinizde burada görünür.
+            Henüz ortak sunum yok. Bir dönemde <b>tüm ekipler</b> sunumunu &quot;hazır&quot; işaretlediğinde
+            birleşmiş hali burada <b>kendiliğinden</b> belirir. Beklemeden hazırlamak isterseniz
+            &quot;+ Yeni Ortak Sunum&quot; ile takımları seçip <b>Ortak Sunumu Kaydet</b> diyebilirsiniz.
           </div>
         )}
 
         <div className="presentation-list">
-          {items && items.map((item) => (
+          {satirlar && satirlar.map((item) => (
             <div
               className={`presentation-row${item.id === selectedId ? " selected" : ""}`}
               key={item.id}
@@ -341,20 +412,37 @@ export default function JointPresentationListPanel({ teams, theme }) {
                 <span className="presentation-row-thumb-badge">
                   <IconLayers style={{ width: 13, height: 13 }} />
                 </span>
-                <span className="presentation-row-thumb-label">{shortDate(item.createdAt)}</span>
+                <span className="presentation-row-thumb-label">
+                  {item.otomatik ? isoToTr(item.donem.bitis) : shortDate(item.createdAt)}
+                </span>
               </div>
               <div className="presentation-row-main">
                 <span className="presentation-row-sprint">
                   {item.title}
+                  {item.otomatik && <span className="otomatik-rozet">Otomatik</span>}
                   <span className="presentation-row-version-pill">{takimSayisi(item.picks)} takım</span>
                 </span>
-                <span className="presentation-row-meta">
-                  <IconCalendar style={{ width: 13, height: 13 }} />
-                  {formatDateTime(item.createdAt)}
-                </span>
-                <span className="presentation-row-meta presentation-row-meta-sub">
-                  {item.createdBy ? `Oluşturan: ${item.createdBy}` : "—"}
-                </span>
+                {item.otomatik ? (
+                  <>
+                    <span className="presentation-row-meta">
+                      <IconCalendar style={{ width: 13, height: 13 }} />
+                      Tüm ekipler sunumunu hazır işaretledi — birleşmiş hali kendiliğinden hazırlandı.
+                    </span>
+                    <span className="presentation-row-meta presentation-row-meta-sub">
+                      Her ekibin en güncel sürümünü gösterir; bir ekip revize ederse burası da güncellenir.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="presentation-row-meta">
+                      <IconCalendar style={{ width: 13, height: 13 }} />
+                      {formatDateTime(item.createdAt)}
+                    </span>
+                    <span className="presentation-row-meta presentation-row-meta-sub">
+                      {item.createdBy ? `Oluşturan: ${item.createdBy}` : "—"}
+                    </span>
+                  </>
+                )}
               </div>
               <div className="presentation-row-actions" onClick={(e) => e.stopPropagation()}>
                 <Button
@@ -366,10 +454,15 @@ export default function JointPresentationListPanel({ teams, theme }) {
                   <IconDownload style={{ width: 15, height: 15 }} />
                   PPTX İndir
                 </Button>
-                <Button variant="ghost" className="presentation-delete-btn" onClick={() => setDeleteFor(item)}>
-                  <IconTrash style={{ width: 15, height: 15 }} />
-                  Sil
-                </Button>
+                {/* Otomatik satirlar SILINEMEZ - kayit degiller, donemden
+                    hesaplaniyorlar. Silinseler bir sonraki acilista geri
+                    gelirlerdi; "sildim ama duruyor" yanilgisi olmasin. */}
+                {!item.otomatik && (
+                  <Button variant="ghost" className="presentation-delete-btn" onClick={() => setDeleteFor(item)}>
+                    <IconTrash style={{ width: 15, height: 15 }} />
+                    Sil
+                  </Button>
+                )}
               </div>
             </div>
           ))}
@@ -399,7 +492,7 @@ export default function JointPresentationListPanel({ teams, theme }) {
 
       {/* Secili kaydin canli onizlemesi - takim bazli listedeki
           .presentation-preview-col ile ayni yer ve ayni karusel gorunumu. */}
-      {items && items.length > 0 && (
+      {satirlar && satirlar.length > 0 && (
         <div className="presentation-preview-col">
           {previewLoading || slides.length === 0 ? (
             <div className="presentation-list-empty">
